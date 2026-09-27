@@ -1,0 +1,55 @@
+test_bad_mode (test_dashboard.ConfigurationTests.test_bad_mode) ... ok
+test_demo_default_and_packaged_path (test_dashboard.ConfigurationTests.test_demo_default_and_packaged_path) ... ok
+test_invalid_database_names (test_dashboard.ConfigurationTests.test_invalid_database_names) ... ok
+test_invalid_ports (test_dashboard.ConfigurationTests.test_invalid_ports) ... ok
+test_missing_and_bad_mongo_uri (test_dashboard.ConfigurationTests.test_missing_and_bad_mongo_uri) ... ok
+test_secret_not_in_repr_or_validation_message (test_dashboard.ConfigurationTests.test_secret_not_in_repr_or_validation_message) ... ok
+test_factory_does_not_read_and_routes_respond (test_dashboard.DashIntegrationTests.test_factory_does_not_read_and_routes_respond) ... D:\Projects\CS-499\.milestone-three-deps\dash\development\base_component.py:159: DeprecationWarning: 
+The dash_table.DataTable will be removed from the builtin dash components in a future major version.
+We recommend using dash-ag-grid as a replacement. Install with `pip install dash[ag-grid]`.
+
+  self._validate_deprecation()
+ok
+test_import_has_no_data_access (test_dashboard.DashIntegrationTests.test_import_has_no_data_access) ... ok
+test_real_filter_callback_http (test_dashboard.DashIntegrationTests.test_real_filter_callback_http) ... ok
+test_real_visual_callback_http (test_dashboard.DashIntegrationTests.test_real_visual_callback_http) ... ok
+test_age_boundaries (test_dashboard.FilterTests.test_age_boundaries) ... ok
+test_invalid_profile_does_not_reset (test_dashboard.FilterTests.test_invalid_profile_does_not_reset) ... ok
+test_original_profiles (test_dashboard.FilterTests.test_original_profiles) ... ok
+test_chart_counts_and_unknown (test_dashboard.PresentationTests.test_chart_counts_and_unknown) ... ok
+test_coordinate_validation (test_dashboard.PresentationTests.test_coordinate_validation) ... ok
+test_empty_and_initial_selection (test_dashboard.PresentationTests.test_empty_and_initial_selection) ... ok
+test_map_uses_named_fields (test_dashboard.PresentationTests.test_map_uses_named_fields) ... ok
+test_selection_survives_reordering (test_dashboard.PresentationTests.test_selection_survives_reordering) ... ok
+test_stale_selection_is_not_another_animal (test_dashboard.PresentationTests.test_stale_selection_is_not_another_animal) ... ok
+test_duplicate_record_ids_rejected (test_dashboard.RecordTests.test_duplicate_record_ids_rejected) ... ok
+test_empty (test_dashboard.RecordTests.test_empty) ... ok
+test_invalid_numbers_become_unknown (test_dashboard.RecordTests.test_invalid_numbers_become_unknown) ... ok
+test_missing_identity_rejected (test_dashboard.RecordTests.test_missing_identity_rejected) ... ok
+test_mongo_identity_and_projection (test_dashboard.RecordTests.test_mongo_identity_and_projection) ... ok
+test_repeat_animal_ids_allowed (test_dashboard.RecordTests.test_repeat_animal_ids_allowed) ... ok
+test_bad_record_becomes_visible_error (test_dashboard.RepositoryServiceTests.test_bad_record_becomes_visible_error) ... ok
+test_empty_distinguished_from_failure (test_dashboard.RepositoryServiceTests.test_empty_distinguished_from_failure) ... ok
+test_invalid_profile_does_not_read (test_dashboard.RepositoryServiceTests.test_invalid_profile_does_not_read) ... ok
+test_json_failures (test_dashboard.RepositoryServiceTests.test_json_failures) ... Sample data read failed (FileNotFoundError)
+Sample data read failed (JSONDecodeError)
+Sample data read failed (ValueError)
+ok
+test_mongo_failure_sanitized (test_dashboard.RepositoryServiceTests.test_mongo_failure_sanitized) ... ok
+test_all_profiles (test_ranking.RankingTests.test_all_profiles) ... ok
+test_best_beyond_first_page (test_ranking.RankingTests.test_best_beyond_first_page) ... ok
+test_boundary_ages_are_preferences (test_ranking.RankingTests.test_boundary_ages_are_preferences) ... ok
+test_configurable_weights (test_ranking.RankingTests.test_configurable_weights) ... ok
+test_empty_and_invalid_profile (test_ranking.RankingTests.test_empty_and_invalid_profile) ... ok
+test_hand_calculated_scores_and_order (test_ranking.RankingTests.test_hand_calculated_scores_and_order) ... ok
+test_missing_explanation_and_zero_score (test_ranking.RankingTests.test_missing_explanation_and_zero_score) ... ok
+test_no_source_mutation (test_ranking.RankingTests.test_no_source_mutation) ... ok
+test_non_dogs_excluded_reset_retains_all (test_ranking.RankingTests.test_non_dogs_excluded_reset_retains_all) ... ok
+test_profile_validation (test_ranking.RankingTests.test_profile_validation) ... ok
+test_ties_independent_of_input_order (test_ranking.RankingTests.test_ties_independent_of_input_order) ... ok
+test_weight_validation (test_ranking.RankingTests.test_weight_validation) ... ok
+
+----------------------------------------------------------------------
+Ran 42 tests in 1.302s
+
+OK

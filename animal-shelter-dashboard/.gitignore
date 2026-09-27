@@ -1,0 +1,13 @@
+# Local Python environments and generated files
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Private local configuration
+.env
+.env.*
+!.env.example
+
+# Historical originals remain local
+original/

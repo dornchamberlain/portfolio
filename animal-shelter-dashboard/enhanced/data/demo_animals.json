@@ -1,0 +1,134 @@
+[
+  {
+    "id": "demo-001",
+    "animal_id": "A-DEMO-001",
+    "name": "Sample 1",
+    "breed": "Labrador Retriever Mix",
+    "sex_upon_outcome": "Intact Female",
+    "animal_type": "Dog",
+    "age_upon_outcome_in_weeks": 52,
+    "location_lat": 30.27,
+    "location_long": -97.74
+  },
+  {
+    "id": "demo-002",
+    "animal_id": "A-DEMO-002",
+    "name": "Sample 2",
+    "breed": "Newfoundland",
+    "sex_upon_outcome": "Intact Female",
+    "animal_type": "Dog",
+    "age_upon_outcome_in_weeks": 60,
+    "location_lat": 30.275,
+    "location_long": -97.735
+  },
+  {
+    "id": "demo-003",
+    "animal_id": "A-DEMO-003",
+    "name": "Sample 3",
+    "breed": "German Shepherd",
+    "sex_upon_outcome": "Intact Male",
+    "animal_type": "Dog",
+    "age_upon_outcome_in_weeks": 68,
+    "location_lat": 30.28,
+    "location_long": -97.72999999999999
+  },
+  {
+    "id": "demo-004",
+    "animal_id": "A-DEMO-004",
+    "name": "Sample 4",
+    "breed": "Siberian Husky",
+    "sex_upon_outcome": "Intact Male",
+    "animal_type": "Dog",
+    "age_upon_outcome_in_weeks": 76,
+    "location_lat": 30.285,
+    "location_long": -97.725
+  },
+  {
+    "id": "demo-005",
+    "animal_id": "A-DEMO-005",
+    "name": "Sample 5",
+    "breed": "Bloodhound",
+    "sex_upon_outcome": "Intact Male",
+    "animal_type": "Dog",
+    "age_upon_outcome_in_weeks": 84,
+    "location_lat": 30.29,
+    "location_long": -97.72
+  },
+  {
+    "id": "demo-006",
+    "animal_id": "A-DEMO-006",
+    "name": "Sample 6",
+    "breed": "Golden Retriever",
+    "sex_upon_outcome": "Intact Male",
+    "animal_type": "Dog",
+    "age_upon_outcome_in_weeks": 92,
+    "location_lat": 30.294999999999998,
+    "location_long": -97.71499999999999
+  },
+  {
+    "id": "demo-007",
+    "animal_id": "A-DEMO-007",
+    "name": "Sample 7",
+    "breed": "Domestic Shorthair",
+    "sex_upon_outcome": "Spayed Female",
+    "animal_type": "Cat",
+    "age_upon_outcome_in_weeks": 100,
+    "location_lat": 30.3,
+    "location_long": -97.71
+  },
+  {
+    "id": "demo-008",
+    "animal_id": "A-DEMO-008",
+    "name": "Sample 8",
+    "breed": "Labrador Retriever Mix",
+    "sex_upon_outcome": "Intact Female",
+    "animal_type": "Dog",
+    "age_upon_outcome_in_weeks": null,
+    "location_lat": 30.305,
+    "location_long": -97.705
+  },
+  {
+    "id": "demo-009",
+    "animal_id": "A-DEMO-009",
+    "name": "Sample 9",
+    "breed": "Rottweiler",
+    "sex_upon_outcome": "Intact Male",
+    "animal_type": "Dog",
+    "age_upon_outcome_in_weeks": 116,
+    "location_lat": null,
+    "location_long": null
+  },
+  {
+    "id": "demo-010",
+    "animal_id": "A-DEMO-010",
+    "name": "Sample 10",
+    "breed": "Chesapeake Bay Retriever",
+    "sex_upon_outcome": "Intact Female",
+    "animal_type": "Dog",
+    "age_upon_outcome_in_weeks": 124,
+    "location_lat": 30.315,
+    "location_long": -97.695
+  },
+  {
+    "id": "demo-011",
+    "animal_id": "A-DEMO-011",
+    "name": "Sample 11",
+    "breed": "Old English Sheepdog",
+    "sex_upon_outcome": "Intact Male",
+    "animal_type": "Dog",
+    "age_upon_outcome_in_weeks": 132,
+    "location_lat": 30.32,
+    "location_long": -97.69
+  },
+  {
+    "id": "demo-012",
+    "animal_id": "A-DEMO-012",
+    "name": "Sample 12",
+    "breed": "Doberman Pinscher",
+    "sex_upon_outcome": "Intact Male",
+    "animal_type": "Dog",
+    "age_upon_outcome_in_weeks": 140,
+    "location_lat": 30.325,
+    "location_long": -97.68499999999999
+  }
+]
