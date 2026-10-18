@@ -1,0 +1,41 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Dorn Chamberlain's computer science portfolio: modular software design, explainable algorithms, and reliable database operations."><title>enhanced/index-results.json | Dorn Chamberlain</title><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><header><nav aria-label="Main navigation"><a class="name" href="index.html">Dorn Chamberlain</a><div class="links"><a href="index.html#self-assessment">Self-assessment</a><a href="project.html">Capstone project</a><a href="code-review.html">Code review</a><a href="resources.html">Files &amp; evidence</a></div></nav></header><main id="main"><p class="eyebrow">Source &amp; evidence</p><h1 style="font-size:2.3rem">enhanced/index-results.json</h1><p><a href="animal-shelter-dashboard/enhanced/index-results.json">Download file</a> · <a href="resources.html">Back to files &amp; evidence</a></p><pre><code>{
+  &quot;records&quot;: 20000,
+  &quot;repetitions&quot;: 20,
+  &quot;synthetic&quot;: true,
+  &quot;before&quot;: {
+    &quot;plan&quot;: [
+      &quot;SCAN animal_records USING INDEX sqlite_autoindex_animal_records_1&quot;
+    ],
+    &quot;median_ms&quot;: 0.2002,
+    &quot;ids&quot;: [
+      &quot;sample-001369&quot;,
+      &quot;sample-001466&quot;,
+      &quot;sample-001563&quot;,
+      &quot;sample-001757&quot;,
+      &quot;sample-001854&quot;,
+      &quot;sample-001951&quot;,
+      &quot;sample-002145&quot;,
+      &quot;sample-002242&quot;,
+      &quot;sample-002339&quot;,
+      &quot;sample-002533&quot;
+    ]
+  },
+  &quot;after&quot;: {
+    &quot;plan&quot;: [
+      &quot;SEARCH animal_records USING COVERING INDEX ix_type_breed_id (animal_type=? AND breed=?)&quot;
+    ],
+    &quot;median_ms&quot;: 0.0211,
+    &quot;ids&quot;: [
+      &quot;sample-001369&quot;,
+      &quot;sample-001466&quot;,
+      &quot;sample-001563&quot;,
+      &quot;sample-001757&quot;,
+      &quot;sample-001854&quot;,
+      &quot;sample-001951&quot;,
+      &quot;sample-002145&quot;,
+      &quot;sample-002242&quot;,
+      &quot;sample-002339&quot;,
+      &quot;sample-002533&quot;
+    ]
+  }
+}</code></pre></main><footer>Dorn Chamberlain · CS 499 Computer Science Capstone · 2026</footer></body></html>

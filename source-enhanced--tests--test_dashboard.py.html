@@ -1,0 +1,240 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Dorn Chamberlain's computer science portfolio: modular software design, explainable algorithms, and reliable database operations."><title>enhanced/tests/test_dashboard.py | Dorn Chamberlain</title><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><header><nav aria-label="Main navigation"><a class="name" href="index.html">Dorn Chamberlain</a><div class="links"><a href="index.html#self-assessment">Self-assessment</a><a href="project.html">Capstone project</a><a href="code-review.html">Code review</a><a href="resources.html">Files &amp; evidence</a></div></nav></header><main id="main"><p class="eyebrow">Source &amp; evidence</p><h1 style="font-size:2.3rem">enhanced/tests/test_dashboard.py</h1><p><a href="animal-shelter-dashboard/enhanced/tests/test_dashboard.py">Download file</a> · <a href="resources.html">Back to files &amp; evidence</a></p><pre><code># Tests use made-up records and mock connections; no real database is changed.
+import json
+import math
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import Mock, patch
+
+from shelter.config import Settings, ConfigurationError
+from shelter.records import normalize_records, DataValidationError
+from shelter.filters import filter_records
+from shelter.presentation import coordinates, selected_record, breed_counts, map_content
+from shelter.repository import JsonRepository, MongoRepository, RepositoryError
+from shelter.service import DashboardService
+from shelter.app import create_app
+
+
+# Start with a valid sample record, then override the fields needed for each test.
+def animal(key=&#x27;1&#x27;, **changes):
+    row = dict(id=key, animal_id=&#x27;REPEATED&#x27;, name=&#x27;Test animal&#x27;, animal_type=&#x27;Dog&#x27;,
+               breed=&#x27;Labrador Retriever Mix&#x27;, sex_upon_outcome=&#x27;Intact Female&#x27;,
+               age_upon_outcome_in_weeks=52, location_lat=30.27, location_long=-97.74)
+    row.update(changes)
+    return row
+
+
+# Configuration checks: defaults, invalid values, and safe error messages.
+class ConfigurationTests(unittest.TestCase):
+    def test_demo_default_and_packaged_path(self):
+        settings = Settings.from_env({})
+        self.assertEqual(settings.mode, &#x27;demo&#x27;)
+        self.assertTrue(settings.data_file.is_file())
+
+    def test_bad_mode(self):
+        with self.assertRaises(ConfigurationError):
+            Settings.from_env({&#x27;SHELTER_MODE&#x27;: &#x27;unexpected&#x27;})
+
+    def test_missing_and_bad_mongo_uri(self):
+        for uri in [&#x27;&#x27;, &#x27;https://example.invalid&#x27;]:
+            with self.subTest(uri=uri), self.assertRaises(ConfigurationError):
+                Settings.from_env({&#x27;SHELTER_MODE&#x27;:&#x27;mongo&#x27;, &#x27;MONGODB_URI&#x27;:uri})
+
+    def test_secret_not_in_repr_or_validation_message(self):
+        settings = Settings.from_env({&#x27;SHELTER_MODE&#x27;:&#x27;mongo&#x27;, &#x27;MONGODB_URI&#x27;:&#x27;mongodb://user:secret@localhost&#x27;})
+        self.assertNotIn(&#x27;secret&#x27;, repr(settings))
+
+    def test_invalid_ports(self):
+        for port in [&#x27;bad&#x27;, &#x27;0&#x27;, &#x27;65536&#x27;, &#x27;1.2&#x27;]:
+            with self.subTest(port=port), self.assertRaises(ConfigurationError):
+                Settings.from_env({&#x27;PORT&#x27;:port})
+
+    def test_invalid_database_names(self):
+        for name in [&#x27;&#x27;, &#x27;a/b&#x27;, &#x27;a.b&#x27;]:
+            with self.subTest(name=name), self.assertRaises(ConfigurationError):
+                Settings.from_env({&#x27;MONGODB_DATABASE&#x27;:name})
+
+
+# Record checks cover identity, missing values, and the format sent to the table.
+class RecordTests(unittest.TestCase):
+    def test_empty(self):
+        self.assertEqual(normalize_records([]), [])
+
+    def test_mongo_identity_and_projection(self):
+        from bson import ObjectId
+        key = ObjectId()
+        rows = normalize_records([dict(_id=key, breed=&#x27; Dog &#x27;, private_field=&#x27;omit&#x27;)])
+        self.assertEqual(rows[0][&#x27;id&#x27;], str(key))
+        self.assertEqual(rows[0][&#x27;breed&#x27;], &#x27;Dog&#x27;)
+        self.assertNotIn(&#x27;private_field&#x27;, rows[0])
+        json.dumps(rows, allow_nan=False)
+
+    def test_duplicate_record_ids_rejected(self):
+        with self.assertRaises(DataValidationError):
+            normalize_records([animal(), animal()])
+
+    def test_repeat_animal_ids_allowed(self):
+        self.assertEqual(len(normalize_records([animal(&#x27;1&#x27;),animal(&#x27;2&#x27;)])),2)
+
+    def test_missing_identity_rejected(self):
+        for row in [{}, {&#x27;id&#x27;:&#x27;&#x27;}, None, {&#x27;id&#x27;:[]}]:
+            with self.subTest(row=row), self.assertRaises(DataValidationError):
+                normalize_records([row])
+
+    def test_invalid_numbers_become_unknown(self):
+        for value in [-1, &#x27;bad&#x27;, True, math.nan, math.inf, None]:
+            with self.subTest(value=value):
+                self.assertIsNone(normalize_records([animal(age_upon_outcome_in_weeks=value)])[0][&#x27;age_upon_outcome_in_weeks&#x27;])
+
+
+# Small examples make the expected rescue matches easy to check by hand.
+class FilterTests(unittest.TestCase):
+    def test_original_profiles(self):
+        rows = [animal(&#x27;water&#x27;), animal(&#x27;mountain&#x27;,breed=&#x27;Siberian Husky&#x27;,sex_upon_outcome=&#x27;Intact Male&#x27;),
+                animal(&#x27;disaster&#x27;,breed=&#x27;Bloodhound&#x27;,sex_upon_outcome=&#x27;Intact Male&#x27;),animal(&#x27;cat&#x27;,animal_type=&#x27;Cat&#x27;)]
+        for profile,key in [(&#x27;WATER&#x27;,&#x27;water&#x27;),(&#x27;MOUNTAIN&#x27;,&#x27;mountain&#x27;),(&#x27;DISASTER&#x27;,&#x27;disaster&#x27;)]:
+            self.assertEqual([r[&#x27;id&#x27;] for r in filter_records(rows,profile)],[key])
+        self.assertEqual(len(filter_records(rows,&#x27;RESET&#x27;)),4)
+
+    def test_age_boundaries(self):
+        for age, expected in [(0,1),(156,1),(156.01,0),(-1,0),(None,0),(&#x27;bad&#x27;,0),(True,0)]:
+            with self.subTest(age=age):
+                self.assertEqual(len(filter_records([animal(age_upon_outcome_in_weeks=age)],&#x27;WATER&#x27;)),expected)
+
+    def test_invalid_profile_does_not_reset(self):
+        for value in [&#x27;invalid&#x27;,None,{},[]]:
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                filter_records([animal()],value)
+
+
+# Map and chart checks, including selection changes and missing coordinates.
+class PresentationTests(unittest.TestCase):
+    def test_selection_survives_reordering(self):
+        a,b=animal(&#x27;1&#x27;),animal(&#x27;2&#x27;)
+        for rows in [[a,b],[b,a]]:
+            self.assertEqual(selected_record(rows,[&#x27;1&#x27;])[0][&#x27;id&#x27;],&#x27;1&#x27;)
+
+    def test_stale_selection_is_not_another_animal(self):
+        row,message=selected_record([animal(&#x27;2&#x27;)],[&#x27;1&#x27;])
+        self.assertIsNone(row)
+        self.assertIn(&#x27;no longer&#x27;,message)
+
+    def test_empty_and_initial_selection(self):
+        self.assertIsNone(selected_record([],[])[0])
+        self.assertEqual(selected_record([animal()],[])[0][&#x27;id&#x27;],&#x27;1&#x27;)
+
+    def test_coordinate_validation(self):
+        for lat,lon in [(91,0),(0,181),(-91,0),(0,-181),(None,0),(True,0),(math.inf,0)]:
+            with self.subTest(lat=lat,lon=lon):
+                self.assertIsNone(coordinates(animal(location_lat=lat,location_long=lon)))
+        self.assertEqual(coordinates(animal(location_lat=0,location_long=0)),[0,0])
+        self.assertEqual(coordinates(animal(location_lat=-90,location_long=180)),[-90,180])
+
+    def test_map_uses_named_fields(self):
+        # Reversing the fields checks that the map no longer depends on column positions.
+        row=dict(reversed(list(animal().items())))
+        self.assertEqual(map_content([row],[&#x27;1&#x27;]).center,[30.27,-97.74])
+
+    def test_chart_counts_and_unknown(self):
+        self.assertEqual(breed_counts([{&#x27;breed&#x27;:&#x27;A&#x27;},{&#x27;breed&#x27;:&#x27;A&#x27;},{&#x27;breed&#x27;:None}]),[(&#x27;A&#x27;,2),(&#x27;Unknown&#x27;,1)])
+        self.assertEqual(breed_counts([]),[])
+
+
+# Mock reads let these tests cover both empty results and database failures.
+class RepositoryServiceTests(unittest.TestCase):
+    def test_empty_distinguished_from_failure(self):
+        repo=Mock()
+        repo.read_all.return_value=[]
+        service=DashboardService(repo)
+        self.assertEqual(service.load(&#x27;RESET&#x27;).message,&#x27;No matching animal records.&#x27;)
+        repo.read_all.side_effect=RepositoryError(&#x27;Animal records could not be loaded.&#x27;)
+        self.assertIn(&#x27;could not&#x27;,service.load(&#x27;RESET&#x27;).message)
+
+    def test_invalid_profile_does_not_read(self):
+        repo=Mock()
+        result=DashboardService(repo).load(&#x27;invalid&#x27;)
+        self.assertEqual(result.rows,[])
+        repo.read_all.assert_not_called()
+
+    def test_bad_record_becomes_visible_error(self):
+        repo=Mock()
+        repo.read_all.return_value=[{}]
+        self.assertIn(&#x27;stable id&#x27;,DashboardService(repo).load(&#x27;RESET&#x27;).message)
+
+    def test_json_failures(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path=Path(temp)/&#x27;data.json&#x27;
+            repo=JsonRepository(path)
+            with self.assertRaises(RepositoryError): repo.read_all()
+            for content in [&#x27;{broken&#x27;,&#x27;{}&#x27;]:
+                path.write_text(content)
+                with self.assertRaises(RepositoryError): repo.read_all()
+
+    def test_mongo_failure_sanitized(self):
+        from pymongo.errors import OperationFailure
+        client=Mock()
+        collection=Mock()
+        client.__getitem__=Mock(return_value={&#x27;animals&#x27;:collection})
+        repo=MongoRepository(client,&#x27;aac&#x27;,&#x27;animals&#x27;)
+        # This fake failure checks that private details do not appear in the message or log.
+        collection.find.side_effect=OperationFailure(&#x27;secret connection detail&#x27;)
+        with self.assertLogs(&#x27;shelter.repository&#x27;,level=&#x27;WARNING&#x27;) as logs:
+            with self.assertRaises(RepositoryError) as error: repo.read_all()
+        self.assertNotIn(&#x27;secret&#x27;,str(error.exception))
+        self.assertNotIn(&#x27;secret&#x27;,&#x27; &#x27;.join(logs.output))
+        repo.close()
+        client.close.assert_called_once()
+
+
+# Requests through Dash catch callback problems that helper tests can miss.
+class DashIntegrationTests(unittest.TestCase):
+    # Each test gets a fresh app and mock so results do not depend on test order.
+    def setUp(self):
+        self.repo=Mock()
+        self.repo.read_all.return_value=[animal()]
+        self.app=create_app(Settings.from_env({}), self.repo)
+        self.client=self.app.server.test_client()
+
+    def test_factory_does_not_read_and_routes_respond(self):
+        self.repo.read_all.assert_not_called()
+        for path in [&#x27;/&#x27;, &#x27;/_dash-layout&#x27;, &#x27;/_dash-dependencies&#x27;]:
+            self.assertEqual(self.client.get(path).status_code,200)
+
+    def test_real_filter_callback_http(self):
+        key=next(k for k in self.app.callback_map if &#x27;animals.data&#x27; in k)
+        response=self.client.post(&#x27;/_dash-update-component&#x27;,json={
+            &#x27;output&#x27;:key,&#x27;outputs&#x27;:[{&#x27;id&#x27;:&#x27;animals&#x27;,&#x27;property&#x27;:&#x27;data&#x27;},{&#x27;id&#x27;:&#x27;status&#x27;,&#x27;property&#x27;:&#x27;children&#x27;},
+                                     {&#x27;id&#x27;:&#x27;animals&#x27;,&#x27;property&#x27;:&#x27;selected_row_ids&#x27;},{&#x27;id&#x27;:&#x27;animals&#x27;,&#x27;property&#x27;:&#x27;page_current&#x27;},
+                                     {&#x27;id&#x27;:&#x27;animals&#x27;,&#x27;property&#x27;:&#x27;sort_by&#x27;}],
+            &#x27;inputs&#x27;:[{&#x27;id&#x27;:&#x27;filter-type&#x27;,&#x27;property&#x27;:&#x27;value&#x27;,&#x27;value&#x27;:&#x27;WATER&#x27;}],
+            &#x27;state&#x27;:[], &#x27;changedPropIds&#x27;:[&#x27;filter-type.value&#x27;]})
+        self.assertEqual(response.status_code,200,response.get_data(as_text=True))
+        payload=response.get_json()[&#x27;response&#x27;]
+        self.assertEqual(payload[&#x27;animals&#x27;][&#x27;data&#x27;][0][&#x27;id&#x27;],&#x27;1&#x27;)
+        self.assertEqual(payload[&#x27;animals&#x27;][&#x27;selected_row_ids&#x27;],[])
+        self.assertEqual(payload[&#x27;animals&#x27;][&#x27;page_current&#x27;],0)
+        self.assertEqual(payload[&#x27;animals&#x27;][&#x27;sort_by&#x27;],[])
+        self.assertEqual(payload[&#x27;animals&#x27;][&#x27;data&#x27;][0][&#x27;score&#x27;],100)
+
+    def test_real_visual_callback_http(self):
+        key=next(k for k in self.app.callback_map if &#x27;breeds.figure&#x27; in k)
+        for rows,ids in [([],[]),([animal()],[&#x27;1&#x27;]),([animal()],[&#x27;missing&#x27;])]:
+            response=self.client.post(&#x27;/_dash-update-component&#x27;,json={
+                &#x27;output&#x27;:key,&#x27;outputs&#x27;:[{&#x27;id&#x27;:&#x27;breeds&#x27;,&#x27;property&#x27;:&#x27;figure&#x27;},{&#x27;id&#x27;:&#x27;map&#x27;,&#x27;property&#x27;:&#x27;children&#x27;}],
+                &#x27;inputs&#x27;:[{&#x27;id&#x27;:&#x27;animals&#x27;,&#x27;property&#x27;:&#x27;derived_virtual_data&#x27;,&#x27;value&#x27;:rows},
+                          {&#x27;id&#x27;:&#x27;animals&#x27;,&#x27;property&#x27;:&#x27;selected_row_ids&#x27;,&#x27;value&#x27;:ids}],
+                &#x27;state&#x27;:[], &#x27;changedPropIds&#x27;:[&#x27;animals.derived_virtual_data&#x27;]})
+            self.assertEqual(response.status_code,200,response.get_data(as_text=True))
+
+    def test_import_has_no_data_access(self):
+        # A separate process checks the first import, rather than reusing already imported modules.
+        script=&quot;from unittest.mock import patch;\nwith patch(&#x27;pymongo.MongoClient&#x27;, side_effect=AssertionError(&#x27;connection at import&#x27;)):\n import shelter.app\n import run\n&quot;
+        result=subprocess.run([sys.executable,&#x27;-c&#x27;,script],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0,result.stderr)
+
+
+if __name__ == &#x27;__main__&#x27;:
+    unittest.main()
+</code></pre></main><footer>Dorn Chamberlain · CS 499 Computer Science Capstone · 2026</footer></body></html>

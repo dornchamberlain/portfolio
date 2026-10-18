@@ -1,0 +1,46 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Dorn Chamberlain's computer science portfolio: modular software design, explainable algorithms, and reliable database operations."><title>enhanced/shelter/config.py | Dorn Chamberlain</title><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><header><nav aria-label="Main navigation"><a class="name" href="index.html">Dorn Chamberlain</a><div class="links"><a href="index.html#self-assessment">Self-assessment</a><a href="project.html">Capstone project</a><a href="code-review.html">Code review</a><a href="resources.html">Files &amp; evidence</a></div></nav></header><main id="main"><p class="eyebrow">Source &amp; evidence</p><h1 style="font-size:2.3rem">enhanced/shelter/config.py</h1><p><a href="animal-shelter-dashboard/enhanced/shelter/config.py">Download file</a> · <a href="resources.html">Back to files &amp; evidence</a></p><pre><code># Read connection settings from the environment instead of embedding them in the dashboard.
+from dataclasses import dataclass, field
+from pathlib import Path
+import os
+
+class ConfigurationError(ValueError):
+    # This gives the startup code a way to identify a problem with the settings.
+    pass
+
+@dataclass(frozen=True)
+# Keep related settings together as one object.
+class Settings:
+    mode: str
+    data_file: Path
+    # The URI may contain a password, so leave it out of the settings representation.
+    mongo_uri: str = field(default=&quot;&quot;, repr=False)
+    database: str = &quot;aac&quot;
+    collection: str = &quot;animals&quot;
+    port: int = 8050
+    sqlite_file: Path = Path(__file__).resolve().parent.parent / &quot;data&quot; / &quot;shelter.sqlite3&quot;
+
+    @classmethod
+    # Tests can supply a dictionary without changing the shell environment.
+    def from_env(cls, env=None):
+        env = os.environ if env is None else env
+        mode = env.get(&quot;SHELTER_MODE&quot;, &quot;demo&quot;)
+        if mode not in {&quot;demo&quot;, &quot;mongo&quot;, &quot;sqlite&quot;}:
+            raise ConfigurationError(&quot;SHELTER_MODE must be demo, mongo, or sqlite.&quot;)
+        try:
+            port = int(env.get(&quot;PORT&quot;, &quot;8050&quot;))
+        except (TypeError, ValueError):
+            raise ConfigurationError(&quot;PORT must be an integer from 1 to 65535.&quot;) from None
+        if not 1 &lt;= port &lt;= 65535:
+            raise ConfigurationError(&quot;PORT must be an integer from 1 to 65535.&quot;)
+        uri = env.get(&quot;MONGODB_URI&quot;, &quot;&quot;)
+        if mode == &quot;mongo&quot; and not uri.startswith((&quot;mongodb://&quot;, &quot;mongodb+srv://&quot;)):
+            raise ConfigurationError(&quot;Set MONGODB_URI to a MongoDB connection URI.&quot;)
+        database = env.get(&quot;MONGODB_DATABASE&quot;, &quot;aac&quot;).strip()
+        collection = env.get(&quot;MONGODB_COLLECTION&quot;, &quot;animals&quot;).strip()
+        if not database or any(c in database for c in &#x27;/\\. &quot;$*&lt;&gt;:|?&#x27;) or not collection or collection.startswith(&quot;$&quot;) or &quot;\x00&quot; in collection:
+            raise ConfigurationError(&quot;Database or collection name is invalid.&quot;)
+        # Resolve sample data relative to this file, not the terminal&#x27;s working directory.
+        default = Path(__file__).resolve().parent.parent / &quot;data&quot; / &quot;demo_animals.json&quot;
+        return cls(mode, Path(env.get(&quot;SHELTER_DATA_FILE&quot;, str(default))).expanduser().resolve(), uri, database, collection, port,
+                   Path(env.get(&quot;SHELTER_SQLITE_FILE&quot;, str(default.parent / &quot;shelter.sqlite3&quot;))).expanduser().resolve())
+</code></pre></main><footer>Dorn Chamberlain · CS 499 Computer Science Capstone · 2026</footer></body></html>

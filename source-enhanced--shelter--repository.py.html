@@ -1,0 +1,76 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Dorn Chamberlain's computer science portfolio: modular software design, explainable algorithms, and reliable database operations."><title>enhanced/shelter/repository.py | Dorn Chamberlain</title><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><header><nav aria-label="Main navigation"><a class="name" href="index.html">Dorn Chamberlain</a><div class="links"><a href="index.html#self-assessment">Self-assessment</a><a href="project.html">Capstone project</a><a href="code-review.html">Code review</a><a href="resources.html">Files &amp; evidence</a></div></nav></header><main id="main"><p class="eyebrow">Source &amp; evidence</p><h1 style="font-size:2.3rem">enhanced/shelter/repository.py</h1><p><a href="animal-shelter-dashboard/enhanced/shelter/repository.py">Download file</a> · <a href="resources.html">Back to files &amp; evidence</a></p><pre><code># Provide the same read interface for MongoDB and the sample file.
+# SQLite CRUD and paged queries are implemented in sql_repository.py.
+import json
+import logging
+from typing import Protocol
+from .records import FIELDS
+
+logger = logging.getLogger(__name__)
+
+class RepositoryError(RuntimeError):
+    # An unsuccessful read should not look like a successful search with no matches.
+    pass
+
+# These are the methods both data sources need so the dashboard can use either one.
+class AnimalRepository(Protocol):
+    def read_all(self) -&gt; list[dict]: ...
+    def close(self) -&gt; None: ...
+
+# This lets me run the dashboard with sample records while the database work is still pending.
+class JsonRepository:
+    def __init__(self, path):
+        self.path = path
+
+    def read_all(self):
+        try:
+            with self.path.open(encoding=&quot;utf-8&quot;) as source:
+                records = json.load(source)
+            if not isinstance(records, list):
+                raise ValueError(&quot;Expected a list&quot;)
+            return records
+        except (OSError, UnicodeError, ValueError) as exc:
+            logger.warning(&quot;Sample data read failed (%s)&quot;, type(exc).__name__)
+            raise RepositoryError(&quot;Sample data could not be loaded. Check SHELTER_DATA_FILE.&quot;) from None
+
+    def close(self):
+        pass
+
+# Keep MongoDB-specific calls behind the shared repository interface.
+class MongoRepository:
+    def __init__(self, client, database, collection):
+        self.client = client
+        self.collection = client[database][collection]
+
+    def read_all(self):
+        from pymongo.errors import PyMongoError
+        try:
+            # Only request the displayed fields and the ID needed to track row selection.
+            return list(self.collection.find({}, {field: 1 for field in (&quot;_id&quot;, *FIELDS)}))
+        except PyMongoError as exc:
+            # Log the error type only; exception text could include connection details.
+            logger.warning(&quot;MongoDB read failed (%s)&quot;, type(exc).__name__)
+            raise RepositoryError(&quot;Animal records could not be loaded. Check the database connection.&quot;) from None
+
+    def close(self):
+        self.client.close()
+
+# Choose the data source from the configured mode.
+def create_repository(settings):
+    if settings.mode == &quot;demo&quot;:
+        return JsonRepository(settings.data_file)
+    if settings.mode == &quot;sqlite&quot;:
+        from .sql_repository import SQLiteRepository
+        return SQLiteRepository(settings.sqlite_file)
+    from pymongo import MongoClient
+    from pymongo.errors import PyMongoError
+    try:
+        # A three-second server-selection timeout bounds the wait for an unavailable server.
+        client = MongoClient(settings.mongo_uri, serverSelectionTimeoutMS=3000, connect=False)
+    except (PyMongoError, ValueError):
+        raise RepositoryError(&quot;MongoDB configuration is invalid.&quot;) from None
+    try:
+        return MongoRepository(client, settings.database, settings.collection)
+    except Exception:
+        client.close()
+        raise
+</code></pre></main><footer>Dorn Chamberlain · CS 499 Computer Science Capstone · 2026</footer></body></html>

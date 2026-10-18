@@ -1,0 +1,61 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Dorn Chamberlain's computer science portfolio: modular software design, explainable algorithms, and reliable database operations."><title>enhanced/manage_db.py | Dorn Chamberlain</title><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><header><nav aria-label="Main navigation"><a class="name" href="index.html">Dorn Chamberlain</a><div class="links"><a href="index.html#self-assessment">Self-assessment</a><a href="project.html">Capstone project</a><a href="code-review.html">Code review</a><a href="resources.html">Files &amp; evidence</a></div></nav></header><main id="main"><p class="eyebrow">Source &amp; evidence</p><h1 style="font-size:2.3rem">enhanced/manage_db.py</h1><p><a href="animal-shelter-dashboard/enhanced/manage_db.py">Download file</a> · <a href="resources.html">Back to files &amp; evidence</a></p><pre><code># Run explicit database setup and CRUD commands from a local terminal.
+import argparse
+import json
+from pathlib import Path
+from shelter.config import Settings
+from shelter.repository import RepositoryError
+from shelter.sql_repository import SQLiteRepository
+
+
+def main():
+    parser = argparse.ArgumentParser(description=&quot;Manage the local shelter SQLite database&quot;)
+    parser.add_argument(&quot;--database&quot;, type=Path, default=Settings.from_env({}).sqlite_file)
+    commands = parser.add_subparsers(dest=&quot;command&quot;, required=True)
+    commands.add_parser(&quot;init&quot;)
+    load = commands.add_parser(&quot;import&quot;)
+    load.add_argument(&quot;file&quot;, type=Path)
+    create = commands.add_parser(&quot;create&quot;)
+    create.add_argument(&quot;file&quot;, type=Path)
+    change = commands.add_parser(&quot;update&quot;)
+    change.add_argument(&quot;id&quot;)
+    change.add_argument(&quot;file&quot;, type=Path)
+    remove = commands.add_parser(&quot;delete&quot;)
+    remove.add_argument(&quot;id&quot;)
+    read = commands.add_parser(&quot;read&quot;)
+    read.add_argument(&quot;--profile&quot;, default=&quot;RESET&quot;)
+    read.add_argument(&quot;--page&quot;, type=int, default=0)
+    read.add_argument(&quot;--page-size&quot;, type=int, default=10)
+    read.add_argument(&quot;--animal-type&quot;)
+    read.add_argument(&quot;--breed&quot;)
+    args = parser.parse_args()
+    repo = SQLiteRepository(args.database)
+    try:
+        if args.command == &quot;init&quot;:
+            repo.initialize()
+            print(&quot;Schema is ready. Existing records were kept.&quot;)
+        elif args.command in {&quot;import&quot;, &quot;create&quot;, &quot;update&quot;}:
+            data = json.loads(args.file.read_text(encoding=&quot;utf-8&quot;))
+            if args.command == &quot;import&quot;:
+                if not isinstance(data, list):
+                    raise ValueError(&quot;Import file must contain a JSON list.&quot;)
+                print(f&quot;Imported {repo.create_many(data)} records.&quot;)
+            elif args.command == &quot;create&quot;:
+                print(f&quot;Created {repo.create(data)}.&quot;)
+            else:
+                print(&quot;Updated.&quot; if repo.update(args.id, data) else &quot;Record not found.&quot;)
+        elif args.command == &quot;delete&quot;:
+            print(&quot;Deleted.&quot; if repo.delete(args.id) else &quot;Record not found.&quot;)
+        else:
+            filters = {key: value for key, value in {&quot;animal_type&quot;: args.animal_type, &quot;breed&quot;: args.breed}.items() if value is not None}
+            result = repo.read_page(profile=args.profile, filters=filters, page=args.page, page_size=args.page_size)
+            print(json.dumps(vars(result), indent=2))
+    except (RepositoryError, ValueError, OSError):
+        # Keep file paths, submitted values, and database internals out of failure output.
+        raise SystemExit(&quot;Operation failed. Check the input file, record constraints, and database setup.&quot;) from None
+    finally:
+        repo.close()
+
+
+if __name__ == &quot;__main__&quot;:
+    main()
+</code></pre></main><footer>Dorn Chamberlain · CS 499 Computer Science Capstone · 2026</footer></body></html>

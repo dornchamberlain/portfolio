@@ -48,8 +48,33 @@ test_non_dogs_excluded_reset_retains_all (test_ranking.RankingTests.test_non_dog
 test_profile_validation (test_ranking.RankingTests.test_profile_validation) ... ok
 test_ties_independent_of_input_order (test_ranking.RankingTests.test_ties_independent_of_input_order) ... ok
 test_weight_validation (test_ranking.RankingTests.test_weight_validation) ... ok
+test_batch_constraint_failure_rolls_back_every_insert (test_sqlite.SQLiteTests.test_batch_constraint_failure_rolls_back_every_insert) ... ok
+test_cli_import_read_update_and_delete (test_sqlite.SQLiteTests.test_cli_import_read_update_and_delete) ... ok
+test_configuration_and_factory (test_sqlite.SQLiteTests.test_configuration_and_factory) ... ok
+test_crud_and_persistence (test_sqlite.SQLiteTests.test_crud_and_persistence) ... ok
+test_direct_database_constraints (test_sqlite.SQLiteTests.test_direct_database_constraints) ... ok
+test_error_message_and_logs_hide_database_details (test_sqlite.SQLiteTests.test_error_message_and_logs_hide_database_details) ... ok
+test_filter_combinations_and_sort (test_sqlite.SQLiteTests.test_filter_combinations_and_sort) ... ok
+test_injection_text_remains_data (test_sqlite.SQLiteTests.test_injection_text_remains_data) ... ok
+test_invalid_batch_is_not_partially_written (test_sqlite.SQLiteTests.test_invalid_batch_is_not_partially_written) ... ok
+test_invalid_query_options (test_sqlite.SQLiteTests.test_invalid_query_options) ... ok
+test_missing_schema_is_not_a_successful_empty_read (test_sqlite.SQLiteTests.test_missing_schema_is_not_a_successful_empty_read) ... SQLite operation failed (OperationalError)
+ok
+test_nulls_boundaries_and_projection (test_sqlite.SQLiteTests.test_nulls_boundaries_and_projection) ... ok
+test_page_query_uses_limit_and_offset (test_sqlite.SQLiteTests.test_page_query_uses_limit_and_offset) ... ok
+test_pagination_ties_and_clamping (test_sqlite.SQLiteTests.test_pagination_ties_and_clamping) ... ok
+test_real_sqlite_dashboard_callbacks (test_sqlite.SQLiteTests.test_real_sqlite_dashboard_callbacks) ... D:\Projects\CS-499\.milestone-three-deps\dash\development\base_component.py:159: DeprecationWarning: 
+The dash_table.DataTable will be removed from the builtin dash components in a future major version.
+We recommend using dash-ag-grid as a replacement. Install with `pip install dash[ag-grid]`.
+
+  self._validate_deprecation()
+ok
+test_repeat_animal_ids_but_unique_record_ids (test_sqlite.SQLiteTests.test_repeat_animal_ids_but_unique_record_ids) ... ok
+test_sort_keeps_preference_rank_and_selection_identity (test_sqlite.SQLiteTests.test_sort_keeps_preference_rank_and_selection_identity) ... ok
+test_sql_ranking_equals_previous_algorithm_across_pages (test_sqlite.SQLiteTests.test_sql_ranking_equals_previous_algorithm_across_pages) ... ok
+test_validation_of_writes_and_identity (test_sqlite.SQLiteTests.test_validation_of_writes_and_identity) ... ok
 
 ----------------------------------------------------------------------
-Ran 42 tests in 1.302s
+Ran 61 tests in 3.280s
 
 OK

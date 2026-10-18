@@ -1,0 +1,23 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Dorn Chamberlain's computer science portfolio: modular software design, explainable algorithms, and reliable database operations."><title>enhanced/run.py | Dorn Chamberlain</title><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><header><nav aria-label="Main navigation"><a class="name" href="index.html">Dorn Chamberlain</a><div class="links"><a href="index.html#self-assessment">Self-assessment</a><a href="project.html">Capstone project</a><a href="code-review.html">Code review</a><a href="resources.html">Files &amp; evidence</a></div></nav></header><main id="main"><p class="eyebrow">Source &amp; evidence</p><h1 style="font-size:2.3rem">enhanced/run.py</h1><p><a href="animal-shelter-dashboard/enhanced/run.py">Download file</a> · <a href="resources.html">Back to files &amp; evidence</a></p><pre><code># Dashboard entry point. Importing this file does not start the server.
+import logging
+from shelter.config import Settings, ConfigurationError
+from shelter.repository import RepositoryError
+from shelter.app import create_app
+
+# Load settings before startup and release the data source at shutdown.
+def main():
+    logging.basicConfig(level=logging.INFO)
+    try:
+        settings = Settings.from_env()
+        app = create_app(settings)
+    except (ConfigurationError, RepositoryError) as exc:
+        raise SystemExit(str(exc)) from None
+    try:
+        app.run(host=&quot;127.0.0.1&quot;, port=settings.port, debug=False)
+    # Cleanup still runs if the server exits because of an error.
+    finally:
+        app.shelter_repository.close()
+
+if __name__ == &quot;__main__&quot;:
+    main()
+</code></pre></main><footer>Dorn Chamberlain · CS 499 Computer Science Capstone · 2026</footer></body></html>

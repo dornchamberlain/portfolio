@@ -1,0 +1,41 @@
+{
+  "records": 20000,
+  "repetitions": 20,
+  "synthetic": true,
+  "before": {
+    "plan": [
+      "SCAN animal_records USING INDEX sqlite_autoindex_animal_records_1"
+    ],
+    "median_ms": 0.2002,
+    "ids": [
+      "sample-001369",
+      "sample-001466",
+      "sample-001563",
+      "sample-001757",
+      "sample-001854",
+      "sample-001951",
+      "sample-002145",
+      "sample-002242",
+      "sample-002339",
+      "sample-002533"
+    ]
+  },
+  "after": {
+    "plan": [
+      "SEARCH animal_records USING COVERING INDEX ix_type_breed_id (animal_type=? AND breed=?)"
+    ],
+    "median_ms": 0.0211,
+    "ids": [
+      "sample-001369",
+      "sample-001466",
+      "sample-001563",
+      "sample-001757",
+      "sample-001854",
+      "sample-001951",
+      "sample-002145",
+      "sample-002242",
+      "sample-002339",
+      "sample-002533"
+    ]
+  }
+}

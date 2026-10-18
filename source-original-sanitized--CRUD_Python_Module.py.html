@@ -1,0 +1,88 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Dorn Chamberlain's computer science portfolio: modular software design, explainable algorithms, and reliable database operations."><title>original-sanitized/CRUD_Python_Module.py | Dorn Chamberlain</title><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><header><nav aria-label="Main navigation"><a class="name" href="index.html">Dorn Chamberlain</a><div class="links"><a href="index.html#self-assessment">Self-assessment</a><a href="project.html">Capstone project</a><a href="code-review.html">Code review</a><a href="resources.html">Files &amp; evidence</a></div></nav></header><main id="main"><p class="eyebrow">Source &amp; evidence</p><h1 style="font-size:2.3rem">original-sanitized/CRUD_Python_Module.py</h1><p><a href="animal-shelter-dashboard/original-sanitized/CRUD_Python_Module.py">Download file</a> · <a href="resources.html">Back to files &amp; evidence</a></p><pre><code># Public comparison copy: historical credentials redacted.
+# Example Python Code to Insert a Document 
+
+from pymongo import MongoClient 
+from bson.objectid import ObjectId 
+
+class AnimalShelter(object): 
+    &quot;&quot;&quot; CRUD operations for Animal collection in MongoDB &quot;&quot;&quot; 
+
+    def __init__(self, username, password): 
+        # Initializing the MongoClient. This helps to access the MongoDB 
+        # databases and collections. This is hard-wired to use the aac 
+        # database, the animals collection, and the aac user. 
+        # 
+        # Connection Variables 
+        # 
+        USER = username
+        PASS = password
+        HOST = &#x27;localhost&#x27; 
+        PORT = 27017 
+        DB = &#x27;aac&#x27; 
+        COL = &#x27;animals&#x27; 
+        # 
+        # Initialize Connection 
+        # 
+        safe_pass = PASS.replace(&quot;!&quot;, &quot;%21&quot;)
+        self.client = MongoClient(
+            f&#x27;mongodb://{USER}:{safe_pass}@{HOST}:{PORT}/?authSource=admin&#x27;
+        )
+        self.database = self.client[DB]
+        self.collection = self.database[COL] 
+
+    # Create a method to return the next available record number for use in the create method
+    # (Not required for Module Four, so left intentionally blank)
+            
+    # Complete this create method to implement the C in CRUD. 
+    def create(self, data):
+        if data is not None:
+            if isinstance(data, dict):
+                try:
+                    result = self.collection.insert_one(data)  # data should be dictionary
+                    return result.acknowledged
+                except Exception:
+                    return False
+            else:
+                return False
+        else: 
+            raise Exception(&quot;Nothing to save, because data parameter is empty&quot;) 
+
+    # Create method to implement the R in CRUD.
+    def read(self, query):
+        if query is not None:
+            if isinstance(query, dict):
+                try:
+                    results = self.collection.find(query)
+                    return list(results)
+                except Exception:
+                    return []
+            else:
+                return []
+        else:
+            return []
+
+    # Update method to handle the U in CRUD.
+    def update(self, query, update_data):
+        if query is None or update_data is None:
+            return 0
+        if not isinstance(query, dict) or not isinstance(update_data, dict):
+            return 0
+        try:
+            result = self.collection.update_many(query, {&quot;$set&quot;: update_data})
+            return result.modified_count
+        except Exception as e:
+            print(f&quot;Update error: {e}&quot;)
+            return 0
+
+    # Delete method to handle the D in CRUD.
+    def delete(self, query):
+        if query is None:
+            return 0
+        if not isinstance(query, dict):
+            return 0
+        try:
+            result = self.collection.delete_many(query)
+            return result.deleted_count
+        except Exception as e:
+            print(f&quot;Delete error: {e}&quot;)
+            return 0</code></pre></main><footer>Dorn Chamberlain · CS 499 Computer Science Capstone · 2026</footer></body></html>

@@ -1,0 +1,45 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Dorn Chamberlain's computer science portfolio: modular software design, explainable algorithms, and reliable database operations."><title>enhanced/shelter/layout.py | Dorn Chamberlain</title><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><header><nav aria-label="Main navigation"><a class="name" href="index.html">Dorn Chamberlain</a><div class="links"><a href="index.html#self-assessment">Self-assessment</a><a href="project.html">Capstone project</a><a href="code-review.html">Code review</a><a href="resources.html">Files &amp; evidence</a></div></nav></header><main id="main"><p class="eyebrow">Source &amp; evidence</p><h1 style="font-size:2.3rem">enhanced/shelter/layout.py</h1><p><a href="animal-shelter-dashboard/enhanced/shelter/layout.py">Download file</a> · <a href="resources.html">Back to files &amp; evidence</a></p><pre><code># Build the page and controls. Other files handle loading and ranking records.
+from pathlib import Path
+from dash import html, dcc, dash_table
+from .records import FIELDS
+
+ASSETS = Path(__file__).resolve().parent / &quot;assets&quot;
+
+# The logo is optional; the dashboard can still open without the image file.
+def build_layout(app, mode):
+    branding = []
+    if (ASSETS / &quot;logo.png&quot;).is_file():
+        branding.append(html.Img(src=app.get_asset_url(&quot;logo.png&quot;), alt=&quot;Grazioso Salvare&quot;, style={&quot;height&quot;: &quot;100px&quot;}))
+    return html.Main([
+        *branding,
+        html.H1(&quot;Animal Shelter Dashboard&quot;),
+        html.P(&quot;Dorn Chamberlain | CS 499 Database Enhancement&quot;),
+        html.P(&quot;Demonstration with synthetic records&quot; if mode == &quot;demo&quot; else (&quot;SQLite animal records&quot; if mode == &quot;sqlite&quot; else &quot;MongoDB animal records&quot;)),
+        html.P(&quot;Preference score: breed 50 points, age 0–156 weeks 30 points, sex 20 points. Missing values earn zero. These demonstration weights do not establish training or rescue readiness.&quot;),
+        html.Label(&quot;Rescue category&quot;, htmlFor=&quot;filter-type&quot;),
+        dcc.RadioItems(id=&quot;filter-type&quot;, options=[
+            {&quot;label&quot;: &quot;Reset (Show All)&quot;, &quot;value&quot;: &quot;RESET&quot;},
+            {&quot;label&quot;: &quot;Water Rescue&quot;, &quot;value&quot;: &quot;WATER&quot;},
+            {&quot;label&quot;: &quot;Mountain or Wilderness Rescue&quot;, &quot;value&quot;: &quot;MOUNTAIN&quot;},
+            {&quot;label&quot;: &quot;Disaster or Individual Tracking&quot;, &quot;value&quot;: &quot;DISASTER&quot;}], value=&quot;RESET&quot;),
+        *([html.Label(&quot;Animal type&quot;, htmlFor=&quot;db-type&quot;),
+           dcc.Dropdown(id=&quot;db-type&quot;, options=[&quot;Dog&quot;, &quot;Cat&quot;], placeholder=&quot;All types&quot;),
+           html.Label(&quot;Exact breed&quot;, htmlFor=&quot;db-breed&quot;),
+           dcc.Input(id=&quot;db-breed&quot;, type=&quot;text&quot;, debounce=True, placeholder=&quot;Any breed&quot;, maxLength=200),
+           html.Label(&quot;Sort order&quot;, htmlFor=&quot;db-sort&quot;),
+           dcc.Dropdown(id=&quot;db-sort&quot;, clearable=False, value=&quot;rank&quot;, options=[
+               {&quot;label&quot;: &quot;Preference rank or record ID&quot;, &quot;value&quot;: &quot;rank&quot;},
+               {&quot;label&quot;: &quot;Name&quot;, &quot;value&quot;: &quot;name&quot;},
+               {&quot;label&quot;: &quot;Breed&quot;, &quot;value&quot;: &quot;breed&quot;},
+               {&quot;label&quot;: &quot;Age&quot;, &quot;value&quot;: &quot;age_upon_outcome_in_weeks&quot;}]),
+           html.P(&quot;The chart and map show the current page. Rankings cover all matching dogs.&quot;)]
+          if mode == &quot;sqlite&quot; else []),
+        html.P(id=&quot;status&quot;, role=&quot;status&quot;),
+        dash_table.DataTable(id=&quot;animals&quot;, columns=[{&quot;name&quot;: f.replace(&quot;_&quot;, &quot; &quot;).title(), &quot;id&quot;: f} for f in (&quot;rank&quot;, &quot;score&quot;, *FIELDS, &quot;score_explanation&quot;)],
+            data=[], page_current=0, page_size=10, page_action=&quot;custom&quot; if mode == &quot;sqlite&quot; else &quot;native&quot;,
+            sort_action=&quot;none&quot; if mode == &quot;sqlite&quot; else &quot;native&quot;, sort_mode=&quot;multi&quot;,
+            filter_action=&quot;none&quot; if mode == &quot;sqlite&quot; else &quot;native&quot;, row_selectable=&quot;single&quot;, selected_row_ids=[],
+            style_table={&quot;overflowX&quot;: &quot;auto&quot;}, style_cell={&quot;textAlign&quot;: &quot;left&quot;, &quot;padding&quot;: &quot;8px&quot;}),
+        dcc.Graph(id=&quot;breeds&quot;), html.H2(&quot;Selected animal location&quot;), html.Div(id=&quot;map&quot;)
+    ], style={&quot;maxWidth&quot;: &quot;1200px&quot;, &quot;margin&quot;: &quot;auto&quot;, &quot;padding&quot;: &quot;24px&quot;, &quot;fontFamily&quot;: &quot;Arial, sans-serif&quot;})
+</code></pre></main><footer>Dorn Chamberlain · CS 499 Computer Science Capstone · 2026</footer></body></html>

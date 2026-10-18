@@ -1,0 +1,50 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Dorn Chamberlain's computer science portfolio: modular software design, explainable algorithms, and reliable database operations."><title>enhanced/shelter/records.py | Dorn Chamberlain</title><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><header><nav aria-label="Main navigation"><a class="name" href="index.html">Dorn Chamberlain</a><div class="links"><a href="index.html#self-assessment">Self-assessment</a><a href="project.html">Capstone project</a><a href="code-review.html">Code review</a><a href="resources.html">Files &amp; evidence</a></div></nav></header><main id="main"><p class="eyebrow">Source &amp; evidence</p><h1 style="font-size:2.3rem">enhanced/shelter/records.py</h1><p><a href="animal-shelter-dashboard/enhanced/shelter/records.py">Download file</a> · <a href="resources.html">Back to files &amp; evidence</a></p><pre><code># Check and normalize incoming records before passing them to the table and map.
+import math
+from collections.abc import Mapping
+
+FIELDS = (&quot;animal_id&quot;, &quot;name&quot;, &quot;animal_type&quot;, &quot;breed&quot;, &quot;sex_upon_outcome&quot;,
+          &quot;age_upon_outcome_in_weeks&quot;, &quot;location_lat&quot;, &quot;location_long&quot;)
+
+class DataValidationError(ValueError):
+    # This separates a record-format problem from a failed database request.
+    pass
+
+# Treat unusable numbers as missing. Watch for True, which Python converts to 1.
+def number(value):
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        result = float(value)
+    except (ValueError, TypeError, OverflowError):
+        return None
+    return result if math.isfinite(result) else None
+
+# One animal can have multiple records, so animal_id is not a unique row identifier.
+def normalize_records(records):
+    result, ids = [], set()
+    for raw in records:
+        if not isinstance(raw, Mapping):
+            raise DataValidationError(&quot;Each animal record must be an object.&quot;)
+        key = raw.get(&quot;_id&quot;, raw.get(&quot;id&quot;))
+        if key is None or isinstance(key, (bool, dict, list)) or not str(key).strip():
+            raise DataValidationError(&quot;Each record requires a stable id or MongoDB _id.&quot;)
+        key = str(key)
+        # Duplicate record IDs would make it unclear which animal the user selected.
+        if key in ids:
+            raise DataValidationError(&quot;Record IDs must be unique; animal IDs may repeat.&quot;)
+        ids.add(key)
+        record = {&quot;id&quot;: key}
+        for field in FIELDS:
+            value = raw.get(field)
+            if field in {&quot;age_upon_outcome_in_weeks&quot;, &quot;location_lat&quot;, &quot;location_long&quot;}:
+                value = number(value)
+                # A negative age stays unknown rather than being changed to a guessed age.
+                if field == &quot;age_upon_outcome_in_weeks&quot; and value is not None and value &lt; 0:
+                    value = None
+            else:
+                value = value.strip() if isinstance(value, str) else None
+                value = value or None
+            record[field] = value
+        result.append(record)
+    return result
+</code></pre></main><footer>Dorn Chamberlain · CS 499 Computer Science Capstone · 2026</footer></body></html>

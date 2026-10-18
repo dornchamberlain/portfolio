@@ -1,0 +1,51 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Dorn Chamberlain's computer science portfolio: modular software design, explainable algorithms, and reliable database operations."><title>enhanced/shelter/presentation.py | Dorn Chamberlain</title><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><header><nav aria-label="Main navigation"><a class="name" href="index.html">Dorn Chamberlain</a><div class="links"><a href="index.html#self-assessment">Self-assessment</a><a href="project.html">Capstone project</a><a href="code-review.html">Code review</a><a href="resources.html">Files &amp; evidence</a></div></nav></header><main id="main"><p class="eyebrow">Source &amp; evidence</p><h1 style="font-size:2.3rem">enhanced/shelter/presentation.py</h1><p><a href="animal-shelter-dashboard/enhanced/shelter/presentation.py">Download file</a> · <a href="resources.html">Back to files &amp; evidence</a></p><pre><code># Chart and map helpers, kept separate to make the callbacks easier to follow.
+from collections import Counter
+from dash import html
+import dash_leaflet as dl
+import plotly.graph_objects as go
+from .records import number
+
+# Count breeds across the filtered records. Alphabetical order breaks count ties.
+def breed_counts(rows):
+    counts = Counter(row.get(&quot;breed&quot;) or &quot;Unknown&quot; for row in (rows or []))
+    return sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:10]
+
+# Sorting changes row positions, so selection follows the record ID.
+def selected_record(rows, selected_ids):
+    if not rows:
+        return None, &quot;No animal records to display.&quot;
+    if not selected_ids:
+        return rows[0], &quot;&quot;
+    # A filtered-out selection should show a message, not a different animal.
+    record = next((row for row in rows if row.get(&quot;id&quot;) == selected_ids[0]), None)
+    return record, &quot;&quot; if record else &quot;The selected record is no longer in these results. Select another row.&quot;
+
+# Missing or out-of-range coordinates cannot produce a valid map marker.
+def coordinates(row):
+    lat, lon = number(row.get(&quot;location_lat&quot;)), number(row.get(&quot;location_long&quot;))
+    if lat is None or lon is None or not (-90 &lt;= lat &lt;= 90 and -180 &lt;= lon &lt;= 180):
+        return None
+    return [lat, lon]
+
+# Count the rows supplied by the callback; SQLite supplies only the current page.
+def chart(rows):
+    counts = breed_counts(rows)
+    fig = go.Figure(go.Bar(x=[item[0] for item in counts], y=[item[1] for item in counts]))
+    fig.update_layout(title=&quot;Top 10 breeds across all filtered table records&quot;, xaxis_title=&quot;Breed&quot;, yaxis_title=&quot;Records&quot;)
+    if not counts:
+        fig.add_annotation(text=&quot;No records to summarize&quot;, showarrow=False)
+    return fig
+
+# Explain missing selections and locations rather than guessing a map position.
+def map_content(rows, selected_ids):
+    row, message = selected_record(rows, selected_ids)
+    if row is None:
+        return html.P(message)
+    position = coordinates(row)
+    if position is None:
+        return html.P(&quot;Location unavailable for this record.&quot;)
+    return dl.Map(center=position, zoom=11, style={&quot;height&quot;: &quot;420px&quot;, &quot;width&quot;: &quot;100%&quot;}, children=[
+        dl.TileLayer(url=&quot;https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png&quot;, attribution=&#x27;&amp;copy; &lt;a href=&quot;https://www.openstreetmap.org/copyright&quot;&gt;OpenStreetMap&lt;/a&gt; contributors&#x27;), dl.Marker(position=position, children=[
+            dl.Tooltip(row.get(&quot;breed&quot;) or &quot;Unknown breed&quot;),
+            dl.Popup(html.P(row.get(&quot;name&quot;) or &quot;Unnamed animal&quot;))])])
+</code></pre></main><footer>Dorn Chamberlain · CS 499 Computer Science Capstone · 2026</footer></body></html>

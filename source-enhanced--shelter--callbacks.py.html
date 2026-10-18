@@ -1,0 +1,22 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Dorn Chamberlain's computer science portfolio: modular software design, explainable algorithms, and reliable database operations."><title>enhanced/shelter/callbacks.py | Dorn Chamberlain</title><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><header><nav aria-label="Main navigation"><a class="name" href="index.html">Dorn Chamberlain</a><div class="links"><a href="index.html#self-assessment">Self-assessment</a><a href="project.html">Capstone project</a><a href="code-review.html">Code review</a><a href="resources.html">Files &amp; evidence</a></div></nav></header><main id="main"><p class="eyebrow">Source &amp; evidence</p><h1 style="font-size:2.3rem">enhanced/shelter/callbacks.py</h1><p><a href="animal-shelter-dashboard/enhanced/shelter/callbacks.py">Download file</a> · <a href="resources.html">Back to files &amp; evidence</a></p><pre><code># Connect the page controls to the data-loading and display functions.
+from dash import Input, Output
+from .presentation import chart, map_content
+
+# The service handles record processing; callbacks pass results to the page.
+def register_callbacks(app, service):
+    @app.callback(Output(&quot;animals&quot;, &quot;data&quot;), Output(&quot;status&quot;, &quot;children&quot;),
+                  Output(&quot;animals&quot;, &quot;selected_row_ids&quot;), Output(&quot;animals&quot;, &quot;page_current&quot;),
+                  Output(&quot;animals&quot;, &quot;sort_by&quot;), Input(&quot;filter-type&quot;, &quot;value&quot;))
+    # Ask the service for rows and a status message for the selected category.
+    def load(profile):
+        result = service.load(profile)
+        # Start each category on page one and clear the previous selection.
+        # Clear table sorting too, so the new ranking appears in its intended order.
+        return result.rows, result.message, [], 0, []
+
+    @app.callback(Output(&quot;breeds&quot;, &quot;figure&quot;), Output(&quot;map&quot;, &quot;children&quot;),
+                  Input(&quot;animals&quot;, &quot;derived_virtual_data&quot;), Input(&quot;animals&quot;, &quot;selected_row_ids&quot;))
+    # Use the filtered table rows to keep the chart and map in sync.
+    def visualize(rows, selected_ids):
+        return chart(rows), map_content(rows, selected_ids)
+</code></pre></main><footer>Dorn Chamberlain · CS 499 Computer Science Capstone · 2026</footer></body></html>

@@ -1,0 +1,30 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Dorn Chamberlain's computer science portfolio: modular software design, explainable algorithms, and reliable database operations."><title>enhanced/shelter/filters.py | Dorn Chamberlain</title><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><header><nav aria-label="Main navigation"><a class="name" href="index.html">Dorn Chamberlain</a><div class="links"><a href="index.html#self-assessment">Self-assessment</a><a href="project.html">Capstone project</a><a href="code-review.html">Code review</a><a href="resources.html">Files &amp; evidence</a></div></nav></header><main id="main"><p class="eyebrow">Source &amp; evidence</p><h1 style="font-size:2.3rem">enhanced/shelter/filters.py</h1><p><a href="animal-shelter-dashboard/enhanced/shelter/filters.py">Download file</a> · <a href="resources.html">Back to files &amp; evidence</a></p><pre><code># Keep the original rescue preferences here so ranking can reuse them.
+# The old strict filter remains for comparison; the dashboard now uses ranking.
+from .records import number
+
+PROFILES = {
+    &quot;WATER&quot;: ({&quot;Labrador Retriever Mix&quot;, &quot;Chesapeake Bay Retriever&quot;, &quot;Newfoundland&quot;}, &quot;Intact Female&quot;),
+    &quot;MOUNTAIN&quot;: ({&quot;German Shepherd&quot;, &quot;Alaskan Malamute&quot;, &quot;Old English Sheepdog&quot;, &quot;Siberian Husky&quot;, &quot;Rottweiler&quot;}, &quot;Intact Male&quot;),
+    &quot;DISASTER&quot;: ({&quot;Doberman Pinscher&quot;, &quot;German Shepherd&quot;, &quot;Golden Retriever&quot;, &quot;Bloodhound&quot;, &quot;Rottweiler&quot;}, &quot;Intact Male&quot;),
+}
+
+# An unknown rescue choice is an input error, not a request to show all records.
+def validate_profile(profile):
+    if not isinstance(profile, str) or profile not in {&quot;RESET&quot;, *PROFILES}:
+        raise ValueError(&quot;Select a valid rescue category or Reset.&quot;)
+
+# A record must meet every condition in the original rescue profile.
+def filter_records(records, profile):
+    validate_profile(profile)
+    if profile == &quot;RESET&quot;:
+        return list(records)
+    breeds, sex = PROFILES[profile]
+    result = []
+    for row in records:
+        age = number(row.get(&quot;age_upon_outcome_in_weeks&quot;))
+        # Age boundaries: zero and 156 weeks are allowed; missing and negative ages are excluded.
+        if (row.get(&quot;animal_type&quot;) == &quot;Dog&quot; and row.get(&quot;breed&quot;) in breeds
+                and row.get(&quot;sex_upon_outcome&quot;) == sex and age is not None and 0 &lt;= age &lt;= 156):
+            result.append(row)
+    return result
+</code></pre></main><footer>Dorn Chamberlain · CS 499 Computer Science Capstone · 2026</footer></body></html>

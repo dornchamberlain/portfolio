@@ -1,0 +1,310 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Dorn Chamberlain's computer science portfolio: modular software design, explainable algorithms, and reliable database operations."><title>original-sanitized/ProjectTwoDashboard.py | Dorn Chamberlain</title><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><header><nav aria-label="Main navigation"><a class="name" href="index.html">Dorn Chamberlain</a><div class="links"><a href="index.html#self-assessment">Self-assessment</a><a href="project.html">Capstone project</a><a href="code-review.html">Code review</a><a href="resources.html">Files &amp; evidence</a></div></nav></header><main id="main"><p class="eyebrow">Source &amp; evidence</p><h1 style="font-size:2.3rem">original-sanitized/ProjectTwoDashboard.py</h1><p><a href="animal-shelter-dashboard/original-sanitized/ProjectTwoDashboard.py">Download file</a> · <a href="resources.html">Back to files &amp; evidence</a></p><pre><code># Public comparison copy: historical credentials redacted.
+# Setup the Jupyter version of Dash
+from jupyter_dash import JupyterDash
+
+# Configure the necessary Python module imports for dashboard components
+import dash_leaflet as dl
+from dash import dcc, html
+import plotly.express as px
+from dash import dash_table
+from dash.dependencies import Input, Output, State
+import base64
+JupyterDash.infer_jupyter_proxy_config()
+
+# Configure OS routines
+import os
+
+# Configure the plotting routines
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+
+####  #####
+# change animal_shelter and AnimalShelter to match your CRUD Python module file name and class name
+from CRUD_Python_Module import AnimalShelter
+
+###########################
+# Data Manipulation / Model
+###########################
+
+username = &quot;REDACTED_FOR_PUBLIC_PORTFOLIO&quot;
+password = &quot;REDACTED_FOR_PUBLIC_PORTFOLIO&quot;
+# Connect to database via CRUD Module
+db = AnimalShelter(username, password)
+
+# class read method must support return of list object and accept projection json input
+# sending the read method an empty document requests all documents be returned
+df = pd.DataFrame.from_records(db.read({}))
+
+# MongoDB v5+ is going to return the &#x27;_id&#x27; column and that is going to have an
+# invlaid object type of &#x27;ObjectID&#x27; - which will cause the data_table to crash - so we remove
+# it in the dataframe here. The df.drop command allows us to drop the column. If we do not set
+# inplace=True - it will reeturn a new dataframe that does not contain the dropped column(s)
+df.drop(columns=[&#x27;_id&#x27;], inplace=True)
+
+# Confirm the database returned records
+print(&quot;Number of records loaded:&quot;, len(df))
+
+## Debug
+# print(len(df.to_dict(orient=&#x27;records&#x27;)))
+# print(df.columns)
+
+
+#########################
+# Dashboard Layout / View
+#########################
+app = JupyterDash(__name__)
+
+# Add in Grazioso Salvare’s logo
+logo_path = os.path.join(os.getcwd(), &quot;Grazioso Salvare Logo.png&quot;)
+encoded_image = base64.b64encode(open(logo_path, &quot;rb&quot;).read()).decode()
+
+# Useful if the image breaks again
+# print(&quot;Current working directory:&quot;, os.getcwd())
+# print(&quot;Logo path being used:&quot;, logo_path)
+
+# Place the HTML image tag in the line below into the app.layout code according to your design
+# Also remember to include a unique identifier such as your name or date
+
+app.layout = html.Div([
+
+    # Header: Logo + unique identifier (name)
+    html.Div([
+        html.Img(
+            src=&quot;data:image/png;base64,{}&quot;.format(encoded_image),
+            style={&quot;height&quot;: &quot;120px&quot;}
+        ),
+        html.H2(&quot;CS-340 Dashboard - Dorn Chamberlain&quot;)
+    ], style={&quot;textAlign&quot;: &quot;center&quot;}),
+
+    html.Hr(),
+
+    # Interactive filtering options (radio buttons)
+    html.Div([
+        html.H4(&quot;Rescue Type Filter&quot;),
+        dcc.RadioItems(
+            id=&quot;filter-type&quot;,
+            options=[
+                {&quot;label&quot;: &quot;Reset (Show All)&quot;, &quot;value&quot;: &quot;RESET&quot;},
+                {&quot;label&quot;: &quot;Water Rescue&quot;, &quot;value&quot;: &quot;WATER&quot;},
+                {&quot;label&quot;: &quot;Mountain or Wilderness Rescue&quot;, &quot;value&quot;: &quot;MOUNTAIN&quot;},
+                {&quot;label&quot;: &quot;Disaster or Individual Tracking&quot;, &quot;value&quot;: &quot;DISASTER&quot;},
+            ],
+            value=&quot;RESET&quot;,
+            labelStyle={&quot;display&quot;: &quot;inline-block&quot;, &quot;marginRight&quot;: &quot;20px&quot;}
+        )
+    ], style={&quot;textAlign&quot;: &quot;center&quot;}),
+
+    html.Hr(),
+
+    # Data table (interactive + user-friendly features)
+    dash_table.DataTable(
+        id=&quot;datatable-id&quot;,
+        columns=[{&quot;name&quot;: i, &quot;id&quot;: i, &quot;deletable&quot;: False, &quot;selectable&quot;: True} for i in df.columns],
+        data=df.to_dict(&quot;records&quot;),
+
+        # These features make the table easier for the client to use
+        page_size=10,
+        page_action=&quot;native&quot;,
+        sort_action=&quot;native&quot;,
+        sort_mode=&quot;multi&quot;,
+        filter_action=&quot;native&quot;,
+
+        # Single-row selection makes the map behavior predictable
+        row_selectable=&quot;single&quot;,
+        selected_rows=[0],
+        column_selectable=&quot;single&quot;,
+
+        style_table={&quot;overflowX&quot;: &quot;auto&quot;},
+        style_cell={&quot;textAlign&quot;: &quot;left&quot;, &quot;padding&quot;: &quot;5px&quot;, &quot;whiteSpace&quot;: &quot;normal&quot;, &quot;height&quot;: &quot;auto&quot;},
+        style_header={&quot;fontWeight&quot;: &quot;bold&quot;}
+    ),
+
+    html.Br(),
+    html.Hr(),
+
+    # This sets up the dashboard so that your chart and your geolocation chart are side-by-side
+    html.Div(
+        className=&quot;row&quot;,
+        style={&quot;display&quot;: &quot;flex&quot;},
+        children=[
+            html.Div(
+                id=&quot;graph-id&quot;,
+                className=&quot;col s12 m6&quot;,
+            ),
+            html.Div(
+                id=&quot;map-id&quot;,
+                className=&quot;col s12 m6&quot;,
+            )
+        ]
+    )
+])
+
+#############################################
+# Interaction Between Components / Controller
+#############################################
+
+@app.callback(
+    Output(&quot;datatable-id&quot;, &quot;data&quot;),
+    [Input(&quot;filter-type&quot;, &quot;value&quot;)]
+)
+def update_dashboard(filter_type):
+    &quot;&quot;&quot;
+    Callback filters the data shown in the table.
+    The table then drives the chart and the map since they use derived_virtual_data.
+    &quot;&quot;&quot;
+
+    # Reset (unfiltered)
+    if filter_type == &quot;RESET&quot;:
+        data = db.read({})
+
+    # Water Rescue
+    elif filter_type == &quot;WATER&quot;:
+        data = db.read({
+            &quot;animal_type&quot;: &quot;Dog&quot;,
+            &quot;breed&quot;: {&quot;$in&quot;: [&quot;Labrador Retriever Mix&quot;, &quot;Chesapeake Bay Retriever&quot;, &quot;Newfoundland&quot;]},
+            &quot;sex_upon_outcome&quot;: &quot;Intact Female&quot;,
+            &quot;age_upon_outcome_in_weeks&quot;: {&quot;$lte&quot;: 156}
+        })
+
+    # Mountain or Wilderness Rescue
+    elif filter_type == &quot;MOUNTAIN&quot;:
+        data = db.read({
+            &quot;animal_type&quot;: &quot;Dog&quot;,
+            &quot;breed&quot;: {&quot;$in&quot;: [&quot;German Shepherd&quot;, &quot;Alaskan Malamute&quot;, &quot;Old English Sheepdog&quot;, &quot;Siberian Husky&quot;, &quot;Rottweiler&quot;]},
+            &quot;sex_upon_outcome&quot;: &quot;Intact Male&quot;,
+            &quot;age_upon_outcome_in_weeks&quot;: {&quot;$lte&quot;: 156}
+        })
+
+    # Disaster or Individual Tracking
+    elif filter_type == &quot;DISASTER&quot;:
+        data = db.read({
+            &quot;animal_type&quot;: &quot;Dog&quot;,
+            &quot;breed&quot;: {&quot;$in&quot;: [&quot;Doberman Pinscher&quot;, &quot;German Shepherd&quot;, &quot;Golden Retriever&quot;, &quot;Bloodhound&quot;, &quot;Rottweiler&quot;]},
+            &quot;sex_upon_outcome&quot;: &quot;Intact Male&quot;,
+            &quot;age_upon_outcome_in_weeks&quot;: {&quot;$lte&quot;: 156}
+        })
+
+    else:
+        data = db.read({})
+
+    # Convert to DataFrame and remove _id if it exists
+    dff = pd.DataFrame.from_records(data)
+    if &quot;_id&quot; in dff.columns:
+        dff.drop(columns=[&quot;_id&quot;], inplace=True)
+
+    return dff.to_dict(&quot;records&quot;)
+
+
+# Display the breeds of animal based on quantity represented in
+# the data table
+@app.callback(
+    Output(&quot;graph-id&quot;, &quot;children&quot;),
+    [Input(&quot;datatable-id&quot;, &quot;derived_virtual_data&quot;)]
+)
+def update_graphs(viewData):
+    &quot;&quot;&quot;
+    This chart updates based on what is currently visible in the table.
+    I used a simple bar chart showing the top 10 breeds (by count) because it is easy to read.
+    &quot;&quot;&quot;
+    if viewData is None:
+        dff = df
+    else:
+        dff = pd.DataFrame.from_dict(viewData)
+
+    # Simple, safe chart: top 10 breeds by count
+    if &quot;breed&quot; not in dff.columns or len(dff) == 0:
+        # If the filter returns no records, show an empty chart with a message
+        fig = px.bar(title=&quot;No data available for this filter&quot;)
+        return [dcc.Graph(figure=fig)]
+
+    breed_counts = (
+        dff[&quot;breed&quot;].fillna(&quot;Unknown&quot;)
+        .value_counts()
+        .head(10)
+        .reset_index()
+    )
+    breed_counts.columns = [&quot;breed&quot;, &quot;count&quot;]
+
+    fig = px.bar(breed_counts, x=&quot;breed&quot;, y=&quot;count&quot;, title=&quot;Top 10 Breeds (Current Filter)&quot;)
+
+    return [dcc.Graph(figure=fig)]
+
+
+# This callback will highlight a cell on the data table when the user selects it
+@app.callback(
+    Output(&#x27;datatable-id&#x27;, &#x27;style_data_conditional&#x27;),
+    [Input(&#x27;datatable-id&#x27;, &#x27;selected_columns&#x27;)]
+)
+def update_styles(selected_columns):
+    # Student note: selected_columns can be None at startup, so I default to an empty list
+    if not selected_columns:
+        selected_columns = []
+
+    return [{
+        &#x27;if&#x27;: {&#x27;column_id&#x27;: i},
+        &#x27;background_color&#x27;: &#x27;#D2F3FF&#x27;
+    } for i in selected_columns]
+
+# This callback will update the geo-location chart for the selected data entry
+# derived_virtual_data will be the set of data available from the datatable in the form of
+# a dictionary.
+# derived_virtual_selected_rows will be the selected row(s) in the table in the form of
+# a list. For this application, we are only permitting single row selection so there is only
+# one value in the list.
+# The iloc method allows for a row, column notation to pull data from the datatable
+@app.callback(
+    Output(&quot;map-id&quot;, &quot;children&quot;),
+    [Input(&quot;datatable-id&quot;, &quot;derived_virtual_data&quot;),
+     Input(&quot;datatable-id&quot;, &quot;derived_virtual_selected_rows&quot;)]
+)
+def update_map(viewData, index):
+    # Make the map show immediately by defaulting to the first row
+    if viewData is None:
+        return
+
+    dff = pd.DataFrame.from_dict(viewData)
+    if len(dff) == 0:
+        return
+
+    # Default to first row if nothing is selected
+    if not index:
+        row = 0
+    else:
+        row = index[0]
+
+    # Austin TX is at [30.75,-97.48]
+    # Dataset includes latitude/longitude columns used here (same as the starter code)
+    return [
+        dl.Map(
+            style={&quot;width&quot;: &quot;1000px&quot;, &quot;height&quot;: &quot;500px&quot;},
+            center=[30.75, -97.48],
+            zoom=10,
+            children=[
+                dl.TileLayer(id=&quot;base-layer-id&quot;),
+                # Marker with tool tip and popup
+                # Column 13 and 14 define the grid-coordinates for the map
+                # Column 4 defines the breed for the animal
+                # Column 9 defines the name of the animal
+                dl.Marker(
+                    position=[dff.iloc[row, 13], dff.iloc[row, 14]],
+                    children=[
+                        dl.Tooltip(dff.iloc[row, 4]),
+                        dl.Popup([
+                            html.H1(&quot;Animal Name&quot;),
+                            html.P(dff.iloc[row, 9])
+                        ])
+                    ]
+                )
+            ]
+        )
+    ]
+
+
+# Run app and display result in jupyterlab mode, note, if you have previously run a prior app, the default port of 8050 may not be available, if so, try setting an alternate port.
+app.run_server()
+
+
+
+</code></pre></main><footer>Dorn Chamberlain · CS 499 Computer Science Capstone · 2026</footer></body></html>

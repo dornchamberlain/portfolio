@@ -27,7 +27,7 @@ def coordinates(row):
         return None
     return [lat, lon]
 
-# These counts cover all filtered rows, including rows on other table pages.
+# Count the rows supplied by the callback; SQLite supplies only the current page.
 def chart(rows):
     counts = breed_counts(rows)
     fig = go.Figure(go.Bar(x=[item[0] for item in counts], y=[item[1] for item in counts]))

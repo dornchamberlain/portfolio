@@ -1,0 +1,11 @@
+{
+  "id": "example-record",
+  "animal_id": "EXAMPLE-ONLY",
+  "name": "Example dog",
+  "animal_type": "Dog",
+  "breed": "Labrador Retriever Mix",
+  "sex_upon_outcome": "Intact Female",
+  "age_upon_outcome_in_weeks": 52,
+  "location_lat": null,
+  "location_long": null
+}

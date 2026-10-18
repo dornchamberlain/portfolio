@@ -1,7 +1,9 @@
-# portfolio
+# Dorn Chamberlain Computer Science ePortfolio
 
-## CS 499 Animal Shelter Dashboard
+Static GitHub Pages portfolio. Open index.html for the self-assessment, project overview, narratives, and source evidence.
 
-[View the dashboard project and run instructions](animal-shelter-dashboard/README.md)
+The final integrated artifact includes SQLite. Original comparison copies are sanitized; see animal-shelter-dashboard/PUBLIC_COMPARISON.md. Untouched originals are not part of this public site.
 
-The Python dashboard demonstrates rescue-candidate scoring and ranking, with automated tests and explanations of the algorithm's design choices. Run it locally using the project instructions.
+Code review: https://youtu.be/IILMWB3O948
+
+Before final submission, verify video playback while signed out and verify GitHub Pages deployment.

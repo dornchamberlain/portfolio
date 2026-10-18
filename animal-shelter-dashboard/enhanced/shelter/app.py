@@ -13,7 +13,11 @@ def create_app(settings=None, repository=None):
     try:
         app = Dash(__name__, assets_folder=str(ASSETS), title="Animal Shelter Dashboard")
         app.layout = build_layout(app, settings.mode)
-        register_callbacks(app, DashboardService(repository))
+        if settings.mode == "sqlite":
+            from .sql_callbacks import register_sql_callbacks
+            register_sql_callbacks(app, repository)
+        else:
+            register_callbacks(app, DashboardService(repository))
         app.shelter_repository = repository
         return app
     except Exception:

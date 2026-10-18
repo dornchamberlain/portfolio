@@ -1,5 +1,5 @@
 # Provide the same read interface for MongoDB and the sample file.
-# The dashboard only needs reads; the database milestone will cover the other CRUD operations.
+# SQLite CRUD and paged queries are implemented in sql_repository.py.
 import json
 import logging
 from typing import Protocol
@@ -58,6 +58,9 @@ class MongoRepository:
 def create_repository(settings):
     if settings.mode == "demo":
         return JsonRepository(settings.data_file)
+    if settings.mode == "sqlite":
+        from .sql_repository import SQLiteRepository
+        return SQLiteRepository(settings.sqlite_file)
     from pymongo import MongoClient
     from pymongo.errors import PyMongoError
     try:

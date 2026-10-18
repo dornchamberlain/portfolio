@@ -1,0 +1,234 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Dorn Chamberlain's computer science portfolio: modular software design, explainable algorithms, and reliable database operations."><title>enhanced/tests/test_sqlite.py | Dorn Chamberlain</title><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><header><nav aria-label="Main navigation"><a class="name" href="index.html">Dorn Chamberlain</a><div class="links"><a href="index.html#self-assessment">Self-assessment</a><a href="project.html">Capstone project</a><a href="code-review.html">Code review</a><a href="resources.html">Files &amp; evidence</a></div></nav></header><main id="main"><p class="eyebrow">Source &amp; evidence</p><h1 style="font-size:2.3rem">enhanced/tests/test_sqlite.py</h1><p><a href="animal-shelter-dashboard/enhanced/tests/test_sqlite.py">Download file</a> · <a href="resources.html">Back to files &amp; evidence</a></p><pre><code># Use real temporary databases to test storage behavior, not mocked SQL calls.
+import json
+from pathlib import Path
+import tempfile
+import subprocess
+import sys
+import unittest
+from unittest.mock import patch
+from sqlalchemy import insert, event
+from sqlalchemy.exc import OperationalError
+from shelter.sql_repository import SQLiteRepository, animals
+from shelter.repository import RepositoryError, create_repository
+from shelter.config import Settings
+from shelter.ranking import rank_records
+from shelter.records import normalize_records
+from shelter.app import create_app
+from test_dashboard import animal
+
+
+class SQLiteTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.path = Path(self.temp.name) / &quot;test.sqlite3&quot;
+        self.repo = SQLiteRepository(self.path)
+        self.repo.initialize()
+
+    def tearDown(self):
+        self.repo.close()
+        self.temp.cleanup()
+
+    def test_crud_and_persistence(self):
+        self.assertEqual(self.repo.create(animal(&quot;first&quot;)), &quot;first&quot;)
+        self.repo.close()
+        self.repo = SQLiteRepository(self.path)
+        self.assertEqual(self.repo.read_page().rows[0][&quot;name&quot;], &quot;Test animal&quot;)
+        self.assertTrue(self.repo.update(&quot;first&quot;, {&quot;name&quot;: &quot;Changed&quot;}))
+        self.assertEqual(self.repo.read_page().rows[0][&quot;name&quot;], &quot;Changed&quot;)
+        self.assertFalse(self.repo.update(&quot;missing&quot;, {&quot;name&quot;: &quot;Changed&quot;}))
+        self.assertTrue(self.repo.delete(&quot;first&quot;))
+        self.assertFalse(self.repo.delete(&quot;first&quot;))
+        self.assertEqual(self.repo.read_page().total, 0)
+
+    def test_batch_constraint_failure_rolls_back_every_insert(self):
+        self.repo.create(animal(&quot;existing&quot;))
+        with self.assertRaises(RepositoryError):
+            self.repo.create_many([animal(&quot;new&quot;), animal(&quot;existing&quot;)])
+        self.assertEqual([r[&quot;id&quot;] for r in self.repo.read_page().rows], [&quot;existing&quot;])
+        # A rejected transaction must not poison the next valid operation.
+        self.repo.create(animal(&quot;after&quot;))
+        self.assertEqual(self.repo.read_page().total, 2)
+
+    def test_invalid_batch_is_not_partially_written(self):
+        with self.assertRaises(ValueError):
+            self.repo.create_many([animal(&quot;good&quot;), animal(&quot;bad&quot;, location_lat=91)])
+        self.assertEqual(self.repo.read_page().total, 0)
+
+    def test_repeat_animal_ids_but_unique_record_ids(self):
+        self.repo.create_many([animal(&quot;a&quot;), animal(&quot;b&quot;)])
+        with self.assertRaises(RepositoryError):
+            self.repo.create(animal(&quot;a&quot;))
+        self.assertEqual(self.repo.read_page().total, 2)
+
+    def test_direct_database_constraints(self):
+        # Bypassing the repository still must not allow corrupt stored values.
+        for values in [{&quot;id&quot;: None}, {&quot;id&quot;: &quot;&quot;}, {&quot;id&quot;: &quot;x&quot;, &quot;age_upon_outcome_in_weeks&quot;: -1},
+                       {&quot;id&quot;: &quot;x&quot;, &quot;age_upon_outcome_in_weeks&quot;: &quot;bad&quot;},
+                       {&quot;id&quot;: &quot;x&quot;, &quot;location_lat&quot;: 91}, {&quot;id&quot;: &quot;x&quot;, &quot;location_long&quot;: -181},
+                       {&quot;id&quot;: &quot;x&quot;, &quot;name&quot;: &quot; &quot;}, {&quot;id&quot;: &quot;x&quot;, &quot;name&quot;: &quot;x&quot; * 201}]:
+            with self.subTest(values=values), self.assertRaises(RepositoryError):
+                with self.repo.transaction() as connection:
+                    # Driver SQL deliberately bypasses SQLAlchemy&#x27;s numeric conversions.
+                    keys = list(values)
+                    connection.exec_driver_sql(
+                        &quot;INSERT INTO animal_records (&quot; + &quot;,&quot;.join(keys) + &quot;) VALUES (&quot; + &quot;,&quot;.join(&quot;?&quot; for _ in keys) + &quot;)&quot;,
+                        tuple(values.values()))
+
+    def test_validation_of_writes_and_identity(self):
+        for changes in [{&quot;age_upon_outcome_in_weeks&quot;: True}, {&quot;location_lat&quot;: float(&quot;inf&quot;)},
+                        {&quot;name&quot;: []}, {&quot;id&quot;: &quot; &quot;}, {&quot;private&quot;: &quot;value&quot;}, {&quot;name&quot;: &quot;x&quot; * 201}]:
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                self.repo.create({**animal(), **changes})
+        self.repo.create(animal())
+        for changes in [{}, {&quot;id&quot;: &quot;new&quot;}, {&quot;location_long&quot;: 181}]:
+            with self.assertRaises(ValueError):
+                self.repo.update(&quot;1&quot;, changes)
+        self.assertEqual(self.repo.read_page().rows[0][&quot;id&quot;], &quot;1&quot;)
+
+    def test_nulls_boundaries_and_projection(self):
+        self.repo.create({&quot;id&quot;: &quot;unknown&quot;})
+        self.repo.create(animal(&quot;edge&quot;, age_upon_outcome_in_weeks=0, location_lat=-90, location_long=180))
+        page = self.repo.read_page(fields=[&quot;id&quot;, &quot;name&quot;])
+        self.assertEqual(set(page.rows[0]), {&quot;id&quot;, &quot;name&quot;})
+        self.assertIsNone(page.rows[1][&quot;name&quot;])
+
+    def test_filter_combinations_and_sort(self):
+        self.repo.create_many([animal(&quot;b&quot;, name=&quot;Zed&quot;, age_upon_outcome_in_weeks=10),
+                               animal(&quot;a&quot;, name=&quot;Amy&quot;, age_upon_outcome_in_weeks=20),
+                               animal(&quot;c&quot;, animal_type=&quot;Cat&quot;), animal(&quot;d&quot;, age_upon_outcome_in_weeks=None)])
+        result = self.repo.read_page(filters={&quot;animal_type&quot;: &quot;Dog&quot;, &quot;min_age&quot;: 10, &quot;max_age&quot;: 20}, sort=&quot;name&quot;, descending=True)
+        self.assertEqual([r[&quot;id&quot;] for r in result.rows], [&quot;b&quot;, &quot;a&quot;])
+        self.assertEqual(self.repo.read_page(filters={&quot;animal_type&quot;: &quot;Cat&quot;, &quot;breed&quot;: &quot;Labrador Retriever Mix&quot;}).total, 1)
+
+    def test_pagination_ties_and_clamping(self):
+        self.repo.create_many([animal(str(i).zfill(2), name=&quot;Same&quot;) for i in range(23)])
+        pages = [self.repo.read_page(page=i, sort=&quot;name&quot;) for i in range(3)]
+        self.assertEqual([len(p.rows) for p in pages], [10, 10, 3])
+        self.assertEqual(len({r[&quot;id&quot;] for p in pages for r in p.rows}), 23)
+        self.assertEqual(self.repo.read_page(page=99).page, 2)
+
+    def test_invalid_query_options(self):
+        cases = [{&quot;page&quot;: -1}, {&quot;page&quot;: True}, {&quot;page_size&quot;: 0}, {&quot;page_size&quot;: 101},
+                 {&quot;sort&quot;: &quot;id; DROP TABLE animal_records&quot;}, {&quot;fields&quot;: [&quot;password&quot;]},
+                 {&quot;fields&quot;: &quot;id&quot;}, {&quot;filters&quot;: {&quot;unknown&quot;: &quot;x&quot;}}, {&quot;filters&quot;: []},
+                 {&quot;filters&quot;: {&quot;min_age&quot;: True}}, {&quot;filters&quot;: {&quot;min_age&quot;: 3, &quot;max_age&quot;: 2}},
+                 {&quot;descending&quot;: &quot;yes&quot;}, {&quot;profile&quot;: &quot;INVALID&quot;}]
+        for kwargs in cases:
+            with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
+                self.repo.read_page(**kwargs)
+
+    def test_injection_text_remains_data(self):
+        value = &quot;x&#x27;; DROP TABLE animal_records; --&quot;
+        self.repo.create(animal(&quot;quoted&quot;, breed=value, name=&quot;O&#x27;Brien&quot;))
+        self.repo.create(animal(&quot;ordinary&quot;))
+        result = self.repo.read_page(filters={&quot;breed&quot;: value})
+        self.assertEqual([r[&quot;id&quot;] for r in result.rows], [&quot;quoted&quot;])
+        self.assertEqual(self.repo.read_page().total, 2)
+
+    def test_sql_ranking_equals_previous_algorithm_across_pages(self):
+        sample = json.loads((Path(__file__).resolve().parents[1] / &quot;data/demo_animals.json&quot;).read_text())
+        sample += [animal(&quot;tie-a&quot;, animal_id=None), animal(&quot;tie-b&quot;, animal_id=None),
+                   animal(&quot;unknown&quot;, breed=None, sex_upon_outcome=None, age_upon_outcome_in_weeks=None)]
+        self.repo.create_many(sample)
+        for profile in [&quot;WATER&quot;, &quot;MOUNTAIN&quot;, &quot;DISASTER&quot;]:
+            expected = rank_records(normalize_records(sample), profile)
+            actual = []
+            for page in range((len(expected) + 3) // 4):
+                actual.extend(self.repo.read_page(profile=profile, page=page, page_size=4).rows)
+            self.assertEqual(actual, expected)
+
+    def test_page_query_uses_limit_and_offset(self):
+        self.repo.create_many([animal(str(i)) for i in range(25)])
+        statements = []
+        def capture(conn, cursor, statement, parameters, context, executemany):
+            statements.append(statement)
+        event.listen(self.repo.engine, &quot;before_cursor_execute&quot;, capture)
+        result = self.repo.read_page(profile=&quot;WATER&quot;, page=1)
+        self.assertEqual(len(result.rows), 10)
+        self.assertTrue(any(&quot;LIMIT&quot; in s and &quot;OFFSET&quot; in s for s in statements))
+
+    def test_error_message_and_logs_hide_database_details(self):
+        error = OperationalError(&quot;secret query&quot;, {}, Exception(&quot;secret path&quot;))
+        with patch.object(self.repo.engine, &quot;begin&quot;, side_effect=error):
+            with self.assertLogs(&quot;shelter.sql_repository&quot;, level=&quot;WARNING&quot;) as logs:
+                with self.assertRaises(RepositoryError) as result:
+                    self.repo.read_page()
+        self.assertNotIn(&quot;secret&quot;, str(result.exception) + str(logs.output))
+
+    def test_missing_schema_is_not_a_successful_empty_read(self):
+        repo = SQLiteRepository(Path(self.temp.name) / &quot;empty.sqlite3&quot;)
+        try:
+            with self.assertRaises(RepositoryError):
+                repo.read_page()
+        finally:
+            repo.close()
+
+    def test_configuration_and_factory(self):
+        settings = Settings.from_env({&quot;SHELTER_MODE&quot;: &quot;sqlite&quot;, &quot;SHELTER_SQLITE_FILE&quot;: str(self.path)})
+        repo = create_repository(settings)
+        try:
+            self.assertEqual(repo.read_page().total, 0)
+        finally:
+            repo.close()
+
+    def test_cli_import_read_update_and_delete(self):
+        script = Path(__file__).resolve().parents[1] / &quot;manage_db.py&quot;
+        source = Path(self.temp.name) / &quot;records.json&quot;
+        source.write_text(json.dumps([animal(&quot;cli&quot;)]))
+        def command(*args):
+            return subprocess.run([sys.executable, str(script), &quot;--database&quot;, str(self.path), *args],
+                                  capture_output=True, text=True)
+        self.assertEqual(command(&quot;import&quot;, str(source)).returncode, 0)
+        self.assertEqual(json.loads(command(&quot;read&quot;).stdout)[&quot;total&quot;], 1)
+        # Repeating an import is rejected, without changing the first import.
+        self.assertNotEqual(command(&quot;import&quot;, str(source)).returncode, 0)
+        source.write_text(json.dumps({&quot;name&quot;: &quot;Updated by CLI&quot;}))
+        self.assertEqual(command(&quot;update&quot;, &quot;cli&quot;, str(source)).stdout.strip(), &quot;Updated.&quot;)
+        self.assertEqual(self.repo.read_page().rows[0][&quot;name&quot;], &quot;Updated by CLI&quot;)
+        self.assertEqual(command(&quot;delete&quot;, &quot;cli&quot;).stdout.strip(), &quot;Deleted.&quot;)
+        self.assertEqual(self.repo.read_page().total, 0)
+
+    def test_sort_keeps_preference_rank_and_selection_identity(self):
+        self.repo.create_many([animal(&quot;low&quot;, name=&quot;Amy&quot;, breed=&quot;Other&quot;), animal(&quot;high&quot;, name=&quot;Zed&quot;)])
+        page = self.repo.read_page(profile=&quot;WATER&quot;, sort=&quot;name&quot;, page_size=1)
+        self.assertEqual(page.rows[0][&quot;id&quot;], &quot;low&quot;)
+        self.assertEqual(page.rows[0][&quot;rank&quot;], 2)
+
+    def test_real_sqlite_dashboard_callbacks(self):
+        self.repo.create_many([animal(str(i).zfill(2)) for i in range(23)])
+        settings = Settings.from_env({&quot;SHELTER_MODE&quot;: &quot;sqlite&quot;, &quot;SHELTER_SQLITE_FILE&quot;: str(self.path)})
+        app = create_app(settings, self.repo)
+        client = app.server.test_client()
+        self.assertEqual(client.get(&quot;/_dash-layout&quot;).status_code, 200)
+        key = next(k for k in app.callback_map if &quot;animals.data&quot; in k)
+        def request(page, changed, breed=None):
+            return client.post(&quot;/_dash-update-component&quot;, json={&quot;output&quot;: key,
+                &quot;outputs&quot;: [{&quot;id&quot;: i, &quot;property&quot;: p} for i, p in [(&quot;animals&quot;, &quot;data&quot;), (&quot;status&quot;, &quot;children&quot;),
+                    (&quot;animals&quot;, &quot;page_count&quot;), (&quot;animals&quot;, &quot;page_current&quot;), (&quot;animals&quot;, &quot;selected_row_ids&quot;)]],
+                &quot;inputs&quot;: [{&quot;id&quot;: i, &quot;property&quot;: p, &quot;value&quot;: v} for i, p, v in [
+                    (&quot;filter-type&quot;, &quot;value&quot;, &quot;WATER&quot;), (&quot;animals&quot;, &quot;page_current&quot;, page),
+                    (&quot;db-type&quot;, &quot;value&quot;, None), (&quot;db-breed&quot;, &quot;value&quot;, breed), (&quot;db-sort&quot;, &quot;value&quot;, &quot;rank&quot;)]],
+                &quot;state&quot;: [], &quot;changedPropIds&quot;: [changed]})
+        response = request(1, &quot;animals.page_current&quot;)
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()[&quot;response&quot;][&quot;animals&quot;]
+        self.assertEqual(payload[&quot;data&quot;][0][&quot;rank&quot;], 11)
+        self.assertEqual(payload[&quot;page_count&quot;], 3)
+        self.assertEqual(payload[&quot;selected_row_ids&quot;], [])
+        self.assertEqual(request(2, &quot;db-sort.value&quot;).get_json()[&quot;response&quot;][&quot;animals&quot;][&quot;page_current&quot;], 0)
+        empty = request(0, &quot;db-breed.value&quot;, &quot;No match&quot;).get_json()[&quot;response&quot;]
+        self.assertEqual(empty[&quot;animals&quot;][&quot;data&quot;], [])
+        self.assertIn(&quot;No matching&quot;, empty[&quot;status&quot;][&quot;children&quot;])
+        visual_key = next(k for k in app.callback_map if &quot;breeds.figure&quot; in k)
+        response = client.post(&quot;/_dash-update-component&quot;, json={
+            &quot;output&quot;: visual_key, &quot;outputs&quot;: [{&quot;id&quot;: &quot;breeds&quot;, &quot;property&quot;: &quot;figure&quot;}, {&quot;id&quot;: &quot;map&quot;, &quot;property&quot;: &quot;children&quot;}],
+            &quot;inputs&quot;: [{&quot;id&quot;: &quot;animals&quot;, &quot;property&quot;: &quot;data&quot;, &quot;value&quot;: payload[&quot;data&quot;]},
+                       {&quot;id&quot;: &quot;animals&quot;, &quot;property&quot;: &quot;selected_row_ids&quot;, &quot;value&quot;: []}],
+            &quot;state&quot;: [], &quot;changedPropIds&quot;: [&quot;animals.data&quot;]})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(&quot;current page&quot;, response.get_json()[&quot;response&quot;][&quot;breeds&quot;][&quot;figure&quot;][&quot;layout&quot;][&quot;title&quot;][&quot;text&quot;])
+
+
+if __name__ == &quot;__main__&quot;:
+    unittest.main()
+</code></pre></main><footer>Dorn Chamberlain · CS 499 Computer Science Capstone · 2026</footer></body></html>

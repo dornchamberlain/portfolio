@@ -1,42 +1,17 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dorn Chamberlain | Computer Science ePortfolio</title>
-</head>
-<body>
-    <header>
-        <h1>Dorn Chamberlain</h1>
-        <p>Computer Science ePortfolio</p>
-    </header>
-
-    <main>
-        <section>
-            <h2>About Me</h2>
-            <p>
-                Welcome to my CS ePortfolio. This portfolio
-                highlights my growth in full-stack development, software design
-                and architecture, and database development.
-            </p>
-        </section>
-
-        <section>
-            <h2>Capstone Enhancements</h2>
-            <p>
-                This site will document enhancements completed for the CS-499
-                Computer Science Capstone.
-            </p>
-            <ul>
-                <li>Software Design and Engineering</li>
-                <li>Algorithms and Data Structures</li>
-                <li>Databases</li>
-            </ul>
-        </section>
-    </main>
-
-    <footer>
-        <p>CS-499 Computer Science Capstone</p>
-    </footer>
-</body>
-</html>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Dorn Chamberlain's computer science portfolio: modular software design, explainable algorithms, and reliable database operations."><title>Professional self-assessment | Dorn Chamberlain</title><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><header><nav aria-label="Main navigation"><a class="name" href="index.html">Dorn Chamberlain</a><div class="links"><a href="index.html#self-assessment">Self-assessment</a><a href="project.html">Capstone project</a><a href="code-review.html">Code review</a><a href="resources.html">Files &amp; evidence</a></div></nav></header><main id="main"><p class="eyebrow">Computer science ePortfolio</p><h1>Professional self-assessment</h1><p class="intro">Dorn Chamberlain · Full-stack software engineering with a backend focus</p><article id="self-assessment"><p>Dorn Chamberlain</p>
+<p>10/18/2026</p>
+<p>My computer science coursework helped me connect individual programming skills to a broader understanding of how software systems work. Through application development, mathematics, algorithms, testing, databases, and security, I developed a clearer picture of how design decisions affect an application’s reliability and usefulness. My goal is to become a full-stack software engineer with a focus on backend development. This portfolio demonstrates my progress toward that goal through improvements to an Animal Shelter Dashboard originally developed in CS 340.</p>
+<p>One of the first projects I had in programming was a text-based game using Python. I liked this project because I was implementing code that I had thought up. It felt cool that I could turn my ideas into actual behavior that software had, and that made me want to learn more and more. Math classes were another way that I built my foundation. I enjoyed seeing how complex math ideas and logic applied to software engineering. I learned through doing software, but it was the education that I received that helped me understand how things worked.</p>
+<h3>Collaboration and Communication</h3>
+<p>In my work as a Senior Technical Program Manager, I regularly bridge the gap between product and engineering teams and project management and executive teams. The information people need varies by situation and individual, so effective communication requires judgment about both content and detail. Executive updates, for example, are generally high level while still providing enough information to support decisions.</p>
+<p>This experience has helped shape how I document technical work. When a developer is reviewing an implementation, they need to know about interfaces, assumptions, failure conditions, etc. When someone is assessing the value of the work, they need to know what problem it solves, why certain decisions were made, and what the behavior is like. My portfolio uses a code review, enhancement stories, documentation, and application screenshots to communicate different levels of detail about the project. I didn&#x27;t work on the dashboard with a shelter team, but I structured the code and accompanying materials so that someone else could understand, run, and review it.</p>
+<h3>Software Engineering and Problem Solving</h3>
+<p>I learned two important lessons from the capstone. First, good software design and engineering means structuring your code around well-defined responsibilities. Second, database access must be robust. I applied these lessons to improve an application in the areas of software design and engineering, algorithms and data structures, and databases. This helped me understand the impact that changes in one area of an application can have on other areas.</p>
+<p>For the software engineering enhancement, I separated the concerns of configuration, data access, application logic, and presentation into different components. This allowed a clearer understanding of responsibilities and the ability to test behavior without the need for the initial database setup.</p>
+<p>I replaced the rigid rescue preference categorization with configurable preference scoring and ranking algorithms. I wrote dictionaries to map rescue roles to scoring profiles, and sets to handle multiple breed matching. The algorithm properly accounts for missing information and ties, and I analyzed the additional processing time and memory required to rank candidates and store explanations. The preference scores demonstrate the degree of preference match, but do not indicate animal suitability for rescue roles.</p>
+<p>I implemented the database improvements in SQLAlchemy and SQLite with validated queries, schema constraints, transactional operations, and pagination. This project has improved my confidence that reliability means predictable behavior on failure, such as rolling back a failed batch import, rejecting invalid records, and proper pagination to maintain meaningful ranking.</p>
+<h3>Testing and Security</h3>
+<p>I automated tests to objectively analyze these decisions. The ultimate change set passed 61 tests for application behavior, ranking, validation, and database access. Synthetic records and temporary SQLite databases were used as the original MongoDB setup was not available. These tests ensure that the local deployment is ok, but do not ensure that the deployment is production-ready or that there is a data migration for the production data.</p>
+<p>My mindset around security has also shifted. I now believe that validating inputs, protecting credentials, and handling failures gracefully should be designed into the application from the ground up. Features such as external configuration, controlled error messages, bounded query inputs, database constraints, and transaction rollback illustrate this in the improved application.</p>
+<h3>Professional Direction</h3>
+<p>These improvements demonstrate how I relate software architecture, backend engineering, persistence, testing, and security. My portfolio demonstrates my growing engineering proficiency and my ability to communicate technical and business concepts. I aim to leverage these skills to develop clear, maintainable, and dependable software and further develop my backend engineering proficiency.</p></article><section><h2>Explore the capstone</h2><p>One application, enhanced across software architecture, candidate ranking, and relational storage.</p><a class="button" href="project.html">Explore the Animal Shelter Dashboard</a><a href="downloads/Professional Self_Dorn Chamberlain.docx">Download self-assessment (Word)</a></section></main><footer>Dorn Chamberlain · CS 499 Computer Science Capstone · 2026</footer></body></html>

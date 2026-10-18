@@ -1,0 +1,193 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Dorn Chamberlain's computer science portfolio: modular software design, explainable algorithms, and reliable database operations."><title>enhanced/shelter/sql_repository.py | Dorn Chamberlain</title><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><header><nav aria-label="Main navigation"><a class="name" href="index.html">Dorn Chamberlain</a><div class="links"><a href="index.html#self-assessment">Self-assessment</a><a href="project.html">Capstone project</a><a href="code-review.html">Code review</a><a href="resources.html">Files &amp; evidence</a></div></nav></header><main id="main"><p class="eyebrow">Source &amp; evidence</p><h1 style="font-size:2.3rem">enhanced/shelter/sql_repository.py</h1><p><a href="animal-shelter-dashboard/enhanced/shelter/sql_repository.py">Download file</a> · <a href="resources.html">Back to files &amp; evidence</a></p><pre><code># Store shelter outcome records in SQLite and keep query choices under application control.
+from contextlib import contextmanager
+from dataclasses import dataclass
+import logging
+import math
+from collections.abc import Mapping
+
+from sqlalchemy import (MetaData, Table, Column, String, Float, CheckConstraint,
+                        Index, create_engine, select, func, case, insert, update, delete, event)
+from sqlalchemy.engine import URL
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+from .records import FIELDS
+from .repository import RepositoryError
+from .filters import validate_profile
+from .ranking import SCORING_PROFILES, score_candidate
+
+logger = logging.getLogger(__name__)
+metadata = MetaData()
+animals = Table(
+    &quot;animal_records&quot;, metadata,
+    Column(&quot;id&quot;, String(120), primary_key=True, nullable=False),
+    *[Column(name, String(200), nullable=True) for name in FIELDS[:5]],
+    *[Column(name, Float, nullable=True) for name in FIELDS[5:]],
+    CheckConstraint(&quot;length(trim(id)) BETWEEN 1 AND 120&quot;, name=&quot;valid_record_id&quot;),
+    CheckConstraint(&quot;age_upon_outcome_in_weeks BETWEEN 0 AND 1.7976931348623157e308&quot;, name=&quot;nonnegative_age&quot;),
+    CheckConstraint(&quot;location_lat BETWEEN -90 AND 90&quot;, name=&quot;valid_latitude&quot;),
+    CheckConstraint(&quot;location_long BETWEEN -180 AND 180&quot;, name=&quot;valid_longitude&quot;),
+)
+for name in FIELDS[5:]:
+    animals.append_constraint(CheckConstraint(
+        f&quot;{name} IS NULL OR typeof({name}) IN (&#x27;integer&#x27;, &#x27;real&#x27;)&quot;, name=f&quot;numeric_{name}&quot;))
+# Outcome records can repeat animal IDs. Only the record ID is unique.
+for name in FIELDS[:5]:
+    animals.append_constraint(CheckConstraint(
+        f&quot;{name} IS NULL OR length(trim({name})) BETWEEN 1 AND 200&quot;,
+        name=f&quot;valid_{name}&quot;))
+# This order supports animal-type searches followed by breed and stable record ID.
+Index(&quot;ix_type_breed_id&quot;, animals.c.animal_type, animals.c.breed, animals.c.id)
+
+
+@dataclass
+class Page:
+    rows: list[dict]
+    total: int
+    page: int
+    page_size: int
+
+
+def validate_values(values, partial=False):
+    # Reject bad writes instead of silently changing a supplied value to unknown.
+    if not isinstance(values, Mapping) or not values:
+        raise ValueError(&quot;Supply a nonempty record object.&quot;)
+    allowed = set(FIELDS) if partial else {&quot;id&quot;, *FIELDS}
+    if set(values) - allowed:
+        raise ValueError(&quot;Record contains unsupported fields.&quot;)
+    if not partial and &quot;id&quot; not in values:
+        raise ValueError(&quot;A record ID is required.&quot;)
+    clean = {}
+    for key, value in values.items():
+        if key in FIELDS[5:]:
+            if value is not None:
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+                    raise ValueError(&quot;Numeric fields must be finite numbers or null.&quot;)
+                if ((key == FIELDS[5] and value &lt; 0) or
+                    (key == &quot;location_lat&quot; and not -90 &lt;= value &lt;= 90) or
+                    (key == &quot;location_long&quot; and not -180 &lt;= value &lt;= 180)):
+                    raise ValueError(&quot;Age or coordinates are outside the allowed range.&quot;)
+        elif value is not None:
+            if not isinstance(value, str) or not value.strip() or len(value.strip()) &gt; (120 if key == &quot;id&quot; else 200):
+                raise ValueError(&quot;Text fields must contain bounded, nonempty text or null.&quot;)
+            value = value.strip()
+        elif key == &quot;id&quot;:
+            raise ValueError(&quot;A record ID is required.&quot;)
+        clean[key] = value
+    if not partial:
+        clean = {key: clean.get(key) for key in (&quot;id&quot;, *FIELDS)}
+    return clean
+
+
+class SQLiteRepository:
+    def __init__(self, path):
+        self.engine = create_engine(URL.create(&quot;sqlite&quot;, database=str(path)),
+                                    connect_args={&quot;timeout&quot;: 5})
+        # Explicit BEGIN gives the count and page queries the same read snapshot.
+        @event.listens_for(self.engine, &quot;connect&quot;)
+        def connect(dbapi_connection, connection_record):
+            dbapi_connection.isolation_level = None
+
+        @event.listens_for(self.engine, &quot;begin&quot;)
+        def begin(connection):
+            connection.exec_driver_sql(&quot;BEGIN&quot;)
+
+    @contextmanager
+    def transaction(self):
+        # Each operation owns a short transaction; failed writes roll back together.
+        try:
+            with self.engine.begin() as connection:
+                yield connection
+        except IntegrityError:
+            raise RepositoryError(&quot;Record conflicts with a database constraint.&quot;) from None
+        except SQLAlchemyError as exc:
+            logger.warning(&quot;SQLite operation failed (%s)&quot;, type(exc).__name__)
+            raise RepositoryError(&quot;Database operation failed. Check the SQLite file and schema.&quot;) from None
+
+    def initialize(self):
+        # Schema creation is an explicit setup step, not an import-time side effect.
+        with self.transaction() as connection:
+            metadata.create_all(connection)
+
+    def create_many(self, records):
+        clean = [validate_values(row) for row in records]
+        if clean:
+            with self.transaction() as connection:
+                connection.execute(insert(animals), clean)
+        return len(clean)
+
+    def create(self, record):
+        self.create_many([record])
+        return record[&quot;id&quot;].strip()
+
+    def update(self, record_id, changes):
+        key = validate_values({&quot;id&quot;: record_id})[&quot;id&quot;]
+        clean = validate_values(changes, partial=True)
+        with self.transaction() as connection:
+            return connection.execute(update(animals).where(animals.c.id == key).values(**clean)).rowcount == 1
+
+    def delete(self, record_id):
+        key = validate_values({&quot;id&quot;: record_id})[&quot;id&quot;]
+        with self.transaction() as connection:
+            return connection.execute(delete(animals).where(animals.c.id == key)).rowcount == 1
+
+    def read_page(self, *, profile=&quot;RESET&quot;, filters=None, sort=&quot;rank&quot;, descending=False,
+                  page=0, page_size=10, fields=None):
+        validate_profile(profile)
+        if type(page) is not int or not 0 &lt;= page &lt;= 1_000_000:
+            raise ValueError(&quot;Page must be an integer from 0 to 1000000.&quot;)
+        if type(page_size) is not int or not 1 &lt;= page_size &lt;= 100:
+            raise ValueError(&quot;Page size must be an integer from 1 to 100.&quot;)
+        if type(descending) is not bool:
+            raise ValueError(&quot;Sort direction must be true or false.&quot;)
+        if not isinstance(sort, str) or sort not in {&quot;rank&quot;, &quot;name&quot;, &quot;breed&quot;, &quot;id&quot;, &quot;animal_id&quot;, &quot;age_upon_outcome_in_weeks&quot;}:
+            raise ValueError(&quot;Unsupported sort field.&quot;)
+        if fields is None:
+            fields = [&quot;id&quot;, *FIELDS]
+        if (not isinstance(fields, (list, tuple)) or not fields or
+            any(not isinstance(f, str) or f not in animals.c for f in fields) or len(set(fields)) != len(fields)):
+            raise ValueError(&quot;Unsupported selected fields.&quot;)
+        filters = {} if filters is None else filters
+        if not isinstance(filters, Mapping) or set(filters) - {&quot;animal_type&quot;, &quot;breed&quot;, &quot;sex_upon_outcome&quot;, &quot;min_age&quot;, &quot;max_age&quot;}:
+            raise ValueError(&quot;Unsupported filter field.&quot;)
+        conditions = []
+        for key, value in filters.items():
+            if key in {&quot;min_age&quot;, &quot;max_age&quot;}:
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value &lt; 0:
+                    raise ValueError(&quot;Age filters must be finite nonnegative numbers.&quot;)
+                conditions.append(animals.c.age_upon_outcome_in_weeks &gt;= value if key == &quot;min_age&quot;
+                                  else animals.c.age_upon_outcome_in_weeks &lt;= value)
+            else:
+                clean = validate_values({key: value}, partial=True)[key]
+                conditions.append(animals.c[key] == clean)
+        if filters.get(&quot;min_age&quot;, 0) &gt; filters.get(&quot;max_age&quot;, math.inf):
+            raise ValueError(&quot;Minimum age cannot exceed maximum age.&quot;)
+        if profile != &quot;RESET&quot;:
+            conditions.append(animals.c.animal_type == &quot;Dog&quot;)
+            rules = SCORING_PROFILES[profile]
+            score = (case((animals.c.breed.in_(sorted(rules.breeds)), rules.weights[0]), else_=0) +
+                     case((animals.c.age_upon_outcome_in_weeks.between(rules.min_age, rules.max_age), rules.weights[1]), else_=0) +
+                     case((animals.c.sex_upon_outcome == rules.sex, rules.weights[2]), else_=0))
+            order = [score.desc(), animals.c.animal_id.is_(None), animals.c.animal_id, animals.c.id]
+            # Assign ranks across the matching set before LIMIT. Ranking one page would be misleading.
+            source = select(animals, score.label(&quot;score&quot;),
+                            func.row_number().over(order_by=order).label(&quot;rank&quot;)).where(*conditions).subquery()
+        else:
+            source = select(animals).where(*conditions).subquery()
+        selected = list(fields)
+        if profile != &quot;RESET&quot;:
+            selected += [&quot;score&quot;, &quot;rank&quot;]
+        statement = select(*(source.c[name] for name in selected))
+        sort_column = source.c.rank if sort == &quot;rank&quot; and profile != &quot;RESET&quot; else source.c[&quot;id&quot; if sort == &quot;rank&quot; else sort]
+        statement = statement.order_by(sort_column.is_(None), sort_column.desc() if descending else sort_column.asc(), source.c.id)
+        with self.transaction() as connection:
+            total = connection.scalar(select(func.count()).select_from(animals).where(*conditions))
+            # Clamp a stale page after deletes or changed filters to the last available page.
+            page = min(page, max(0, (total - 1) // page_size))
+            rows = [dict(row) for row in connection.execute(statement.limit(page_size).offset(page * page_size)).mappings()]
+        if profile != &quot;RESET&quot; and all(f in fields for f in (&quot;breed&quot;, &quot;sex_upon_outcome&quot;, &quot;age_upon_outcome_in_weeks&quot;)):
+            # Reuse the tested explanation logic only for the returned page.
+            rows = [score_candidate(row, rules) for row in rows]
+        return Page(rows, total, page, page_size)
+
+    def close(self):
+        self.engine.dispose()
+</code></pre></main><footer>Dorn Chamberlain · CS 499 Computer Science Capstone · 2026</footer></body></html>

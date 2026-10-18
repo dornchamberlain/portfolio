@@ -17,14 +17,15 @@ class Settings:
     database: str = "aac"
     collection: str = "animals"
     port: int = 8050
+    sqlite_file: Path = Path(__file__).resolve().parent.parent / "data" / "shelter.sqlite3"
 
     @classmethod
     # Tests can supply a dictionary without changing the shell environment.
     def from_env(cls, env=None):
         env = os.environ if env is None else env
         mode = env.get("SHELTER_MODE", "demo")
-        if mode not in {"demo", "mongo"}:
-            raise ConfigurationError("SHELTER_MODE must be demo or mongo.")
+        if mode not in {"demo", "mongo", "sqlite"}:
+            raise ConfigurationError("SHELTER_MODE must be demo, mongo, or sqlite.")
         try:
             port = int(env.get("PORT", "8050"))
         except (TypeError, ValueError):
@@ -40,4 +41,5 @@ class Settings:
             raise ConfigurationError("Database or collection name is invalid.")
         # Resolve sample data relative to this file, not the terminal's working directory.
         default = Path(__file__).resolve().parent.parent / "data" / "demo_animals.json"
-        return cls(mode, Path(env.get("SHELTER_DATA_FILE", str(default))).expanduser().resolve(), uri, database, collection, port)
+        return cls(mode, Path(env.get("SHELTER_DATA_FILE", str(default))).expanduser().resolve(), uri, database, collection, port,
+                   Path(env.get("SHELTER_SQLITE_FILE", str(default.parent / "shelter.sqlite3"))).expanduser().resolve())

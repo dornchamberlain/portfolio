@@ -1,4 +1,4 @@
-#Score preference matches without claiming an animal is ready for rescue work.
+# Score preference matches without claiming an animal is ready for rescue work.
 from dataclasses import dataclass
 import math
 from .filters import PROFILES, validate_profile

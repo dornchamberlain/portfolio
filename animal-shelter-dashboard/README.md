@@ -1,39 +1,77 @@
-# Milestone Three Algorithms and Data Structures
+# Milestone Four Database Enhancement
 
-Dorn Chamberlain
+Dorn Chamberlain | CS 499 | October 1, 2026
 
-This enhancement extends the Milestone Two Animal Shelter Dashboard with explainable rescue preference scoring. The standalone enhanced application and tests are in `enhanced`. Historical CS 340 originals are kept in the private coursework files and are not included in this public copy because they contain old credentials and notebook output.
+The Animal Shelter Dashboard now uses SQLAlchemy 2.0 and SQLite for constrained storage, transactional CRUD, validated queries, and database pagination. It retains Milestone Three scoring. `original-sanitized` contains publicly redacted CS 340 comparison source; `enhanced` contains the application, sample records, tools, and tests. The narrative is a separate Word file.
 
-## Run
+## Start the SQLite dashboard
 
-From `enhanced`, using Python 3.12:
+Extract the ZIP and open PowerShell in `enhanced`:
 
 ```powershell
 py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe manage_db.py init
+.\.venv\Scripts\python.exe manage_db.py import data/demo_animals.json
+$env:SHELTER_MODE = "sqlite"
 .\.venv\Scripts\python.exe run.py
 ```
 
-Open http://127.0.0.1:8050. Demo mode uses the inherited 12 synthetic records. No database is required. Map tiles require network access. Run tests with `.\.venv\Scripts\python.exe -m unittest discover -s tests -v`.
+Open http://127.0.0.1:8050. Import loads 12 synthetic records. The ZIP excludes generated databases; setup creates `enhanced/data/shelter.sqlite3`. Skip import if the sample records are already loaded. Initialization preserves existing records; repeated imports are rejected because record IDs must be unique. For later runs, set the mode and run `run.py`. Without a mode setting, the inherited JSON demo remains the default and does not exercise SQLite. `.env.example` is documentation, not an automatically loaded configuration file.
 
-## Algorithm and data structures
+To use another file, pass `--database "D:/data/example.sqlite3"` before the management command and set `SHELTER_SQLITE_FILE` to the same path for the dashboard. Its parent folder must exist. Default paths resolve from the application folder, independent of the terminal directory. `PORT` changes the local port. SQLite needs no database credentials.
 
-`ranking.py` looks up a frozen scoring profile in a dictionary. The preferred dog breeds are stored in a frozenset. Each dog record gets 50 points if the breed matches one of the preferred breeds, 30 points for age between 0 and 156 weeks inclusive, and 20 points for the sex preferred by the profile. These are example, configurable weights based on the original criteria, not empirically derived weights for predicting suitability as a rescue dog. All dog records are possible matches including records with 0 points. Non-dog animals and unknown animal types are excluded from rescue matching. Reset displays all normalized records without scoring.
+## Schema and integrity
 
-The score function computes a new results dictionary. It assigns points and explanations for each criterion. Missing or invalid values get 0 points without penalizing the other criteria (i.e. the other criteria are not down-weighted). This avoids giving incomplete records an unrealistically high percentage score. The list of results is sorted by descending score, ascending animal ID, and then by unique record ID. Text fields (animal IDs and record IDs) are sorted lexicographically. When scores tie, records with missing animal IDs come after records with known IDs. Ties are broken by unique record ID. Rank is the sequential rank (Each record receives a separate rank, even when scores tie.). Record IDs must be present and unique. Animal IDs can be repeated.
+One row in `animal_records` represents one shelter outcome record, not an animal's entire history. The required text primary key `id` is unique and preserves dashboard selection identity. Repeated `animal_id` values are allowed. Separating animals and outcomes would require history and identity information absent from these samples; the schema does not invent those relationships.
 
-The service will normalize the data before scoring. Numeric booleans, non-finite numbers, negative ages, and unparsable ages will become unknown. Profile building will reject invalid age bound/weight combinations; weights must be three finite, non-negative numbers that add up to 100. Breed and sex matching will continue to be exact and case-sensitive, and will adhere to the same validity constraints as the rest of the data set.
+| Fields | Rules |
+| --- | --- |
+| id | Required unique primary key; 1-120 trimmed characters |
+| animal_id, name, animal_type, breed, sex_upon_outcome | Nullable text; 1-200 characters when present |
+| age_upon_outcome_in_weeks | Nullable finite number; nonnegative |
+| location_lat, location_long | Nullable numbers within +/-90 and +/-180 |
 
-The algorithm scores the entire candidate list before the table breaks it up into pages of ten rows. Searching on a rescue category resets any prior choices of sorting, selection, and page position. The user is then free to further sort the table (the Rank column holds the original sorting of the algorithm). The chart reflects the records remaining after table filtering, and map selection is by stable record IDs.
+Unknown optional values use SQL NULL. Writes reject invalid values instead of silently changing them to unknown. Python validation rejects wrong types, numeric booleans, non-finite numbers, oversized text, and unknown fields. SQLite constraints independently protect identity, lengths, numeric storage, and ranges. Updates cannot change the primary key. The SQLite-specific `typeof` checks need adaptation for PostgreSQL.
 
-Scoring complexity is O(nm), assuming bounded field lengths and average constant-time set lookups. Sorting complexity is O(n log n). Explanations per criterion are stored for scorers, which uses O(nm) memory (or O(n) if there are 3 fixed criteria). The strict filter is O(n), so the ranking (which adds work to give more information, but does not claim any speed improvements) is only worth the extra information. Full list ranking requires more memory per page than scoring individual pages (to avoid missing possible top-scoring pages towards the end of the list), but avoids the redundant lookup. Consider evaluating bounded top-k page ranking, or database-assisted ranking, for much larger datasets.
+Each operation owns a short transaction. Batch imports are atomic: a constraint failure rolls back the full batch. Explicit BEGIN keeps count and page reads in one snapshot. Connections return to the pool after operations; shutdown disposes the engine. Controlled errors distinguish failures from empty results without displaying submitted values or database paths.
 
-## Architecture and scope
+## CRUD and validated queries
 
-The new `ranking.py` separates scoring from ranking. `service.py` selects the ranking flow, `layout.py` exposes score and explanations, and `callbacks.py` clears stale table sort state. The old `filters.py` remains as a reference and source of original breed/sex preferences; the application now calls `rank_records`, not the old strict filter. Existing normalization, repository, map, chart, and configuration responsibilities remain in their modules.
+The dashboard is read-only. The repository and `manage_db.py` provide local writes. Create files contain one JSON object; update files contain changed fields; imports contain lists. Example files are in `enhanced/data/crud_examples`.
 
-The MongoDB mode is still available via the environment variables in enhanced/.env.example. The file is for documentation purposes and is not automatically loaded. SQLite migration is not implemented in this milestone. The tests are using fake data and mock database calls. A live database or original application run is not claimed.
+```powershell
+.\.venv\Scripts\python.exe manage_db.py create data/crud_examples/create.json
+.\.venv\Scripts\python.exe manage_db.py read --profile WATER --page 0 --page-size 5
+.\.venv\Scripts\python.exe manage_db.py update example-record data/crud_examples/update.json
+.\.venv\Scripts\python.exe manage_db.py delete example-record
+```
 
-Original files contained historical credentials and notebook output that could be used by someone to compare against an assignment. Review and clean the originals before publishing to a public ePortfolio. Improved code uses environment variables for configuration and does not contain any copied credentials.
+`read_page` supports selected fields; exact animal type, breed, and sex filters; minimum/maximum age; validated sorting and direction; and zero-based pages of 1-100 rows. Record ID breaks sort ties. Invalid fields and ranges are rejected. SQLAlchemy binds submitted values; column identifiers come from an allowlist. The UI exposes type/breed filters, rank/name/breed/age sorting, and ten-row pages. The repository supports the additional options without exposing raw SQL input.
 
-See `enhanced/VALIDATION.md` for verification and `enhanced/test-results.txt` for the recorded test run. The narrative is a separate Word deliverable.
+## Ranking and pagination
+
+SQLite computes the same preference scores as Milestone Three and assigns sequential ranks with a window function before LIMIT/OFFSET. Ties use known animal IDs first, then animal ID and unique record ID. Zero-score dogs remain candidates. Reset includes all types with blank ranks and scores. Filters recompute ranks within the matching set; other sort choices retain those rank numbers. Tests compare SQL and Python results for all profiles across multiple pages.
+
+Only the current page reaches the browser. Chart and map labels identify that page-local scope. Paging clears selection; changing category, filters, or sort resets to page one. Stale pages are clamped to the last available page. Ranking still processes the matching set and can require sorting: pagination reduces transferred rows and Python result memory, not the full database ranking cost. Large offsets add work; keyset pagination remains a future option.
+
+## Index evaluation
+
+The composite index `ix_type_breed_id (animal_type, breed, id)` supports exact type/breed searches and stable ID sorting. `evaluate_index.py` compares one projected, paged query on 20,000 synthetic records before and after indexing. `enhanced/index-results.json` records identical result IDs, query plans, and 20-run median timings. The plan changes from a primary-key index scan to a covering composite-index search. The recorded medians were 0.2002 ms before and 0.0211 ms after. This small local experiment is not a production speed guarantee or a ranking benchmark. Indexes consume storage and add write work; this index does not cover every sort or calculated score.
+
+## Scope and verification
+
+SQLite provides a portable local demonstration. File access uses operating-system permissions. Authentication, authorization, encryption, concurrent-user load testing, and hosted deployment are outside this milestone. PostgreSQL requires schema adaptations and separate testing. The original MongoDB service is unavailable and has not been retested. Historical MongoDB and JSON modes remain for comparison. This is an application/schema migration with synthetic data, not a migration of unavailable production records.
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+.\.venv\Scripts\python.exe evaluate_index.py
+```
+
+All 61 tests passed. See `enhanced/VALIDATION.md` and `enhanced/test-results.txt`. Public comparison hashes are in `PUBLIC_SHA256.txt`; changes are documented in `PUBLIC_COMPARISON.md`. Comments use consistent Python `#` syntax with purpose, decision, and edge-case explanations. Untouched originals are retained separately for course submission.
+
+## References
+
+- SQLAlchemy transactions and parameters: https://docs.sqlalchemy.org/en/20/tutorial/dbapi_transactions.html
+- SQLite query planning: https://www.sqlite.org/queryplanner.html
+- SQLite query-plan output: https://www.sqlite.org/eqp.html

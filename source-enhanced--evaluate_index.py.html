@@ -1,0 +1,42 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Dorn Chamberlain's computer science portfolio: modular software design, explainable algorithms, and reliable database operations."><title>enhanced/evaluate_index.py | Dorn Chamberlain</title><link rel="stylesheet" href="style.css"></head><body><a class="skip" href="#main">Skip to content</a><header><nav aria-label="Main navigation"><a class="name" href="index.html">Dorn Chamberlain</a><div class="links"><a href="index.html#self-assessment">Self-assessment</a><a href="project.html">Capstone project</a><a href="code-review.html">Code review</a><a href="resources.html">Files &amp; evidence</a></div></nav></header><main id="main"><p class="eyebrow">Source &amp; evidence</p><h1 style="font-size:2.3rem">enhanced/evaluate_index.py</h1><p><a href="animal-shelter-dashboard/enhanced/evaluate_index.py">Download file</a> · <a href="resources.html">Back to files &amp; evidence</a></p><pre><code># Compare the same query before and after adding the planned composite index.
+import json
+from pathlib import Path
+import statistics
+import tempfile
+import time
+from shelter.sql_repository import SQLiteRepository
+
+
+def evaluate():
+    with tempfile.TemporaryDirectory() as folder:
+        repo = SQLiteRepository(Path(folder) / &quot;index-test.sqlite3&quot;)
+        try:
+            repo.initialize()
+            rows = [{&quot;id&quot;: f&quot;sample-{i:06d}&quot;, &quot;animal_type&quot;: &quot;Dog&quot; if i % 4 else &quot;Cat&quot;,
+                     &quot;breed&quot;: f&quot;Breed {i % 97:02d}&quot;} for i in range(20000)]
+            repo.create_many(rows)
+            result = {&quot;records&quot;: len(rows), &quot;repetitions&quot;: 20, &quot;synthetic&quot;: True}
+            query = &quot;SELECT id, breed FROM animal_records WHERE animal_type = ? AND breed = ? ORDER BY id LIMIT 10 OFFSET 10&quot;
+            with repo.transaction() as connection:
+                connection.exec_driver_sql(&quot;DROP INDEX ix_type_breed_id&quot;)
+                for label in [&quot;before&quot;, &quot;after&quot;]:
+                    if label == &quot;after&quot;:
+                        connection.exec_driver_sql(&quot;CREATE INDEX ix_type_breed_id ON animal_records (animal_type, breed, id)&quot;)
+                    connection.exec_driver_sql(&quot;ANALYZE&quot;)
+                    plan = [r[3] for r in connection.exec_driver_sql(&quot;EXPLAIN QUERY PLAN &quot; + query, (&quot;Dog&quot;, &quot;Breed 11&quot;))]
+                    elapsed = []
+                    for _ in range(result[&quot;repetitions&quot;]):
+                        start = time.perf_counter()
+                        matches = connection.exec_driver_sql(query, (&quot;Dog&quot;, &quot;Breed 11&quot;)).all()
+                        elapsed.append((time.perf_counter() - start) * 1000)
+                    result[label] = {&quot;plan&quot;: plan, &quot;median_ms&quot;: round(statistics.median(elapsed), 4),
+                                     &quot;ids&quot;: [r[0] for r in matches]}
+            assert result[&quot;before&quot;][&quot;ids&quot;] == result[&quot;after&quot;][&quot;ids&quot;]
+            return result
+        finally:
+            repo.close()
+
+
+if __name__ == &quot;__main__&quot;:
+    print(json.dumps(evaluate(), indent=2))
+</code></pre></main><footer>Dorn Chamberlain · CS 499 Computer Science Capstone · 2026</footer></body></html>
