@@ -9,5 +9,5 @@ __pycache__/
 .env.*
 !.env.example
 
-# Historical originals remain local
+# Untouched historical originals remain private
 original/
